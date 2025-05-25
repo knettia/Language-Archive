@@ -13,7 +13,7 @@ use super::value::*;
 
 pub struct Interpreter
 {
-	root: Root
+
 }
 
 impl Interpreter
@@ -140,14 +140,14 @@ impl Interpreter
 		}
 	}
 
-	pub fn new(root: Root) -> Self
+	pub fn new() -> Self
 	{
-		Self { root }
+		Self { }
 	}
 
-	pub fn interpret(&self)
+	pub fn interpret(&self, root: &Root)
 	{
-		for statement in self.root.statements.clone()
+		for statement in root.statements.clone()
 		{
 			match statement.statement_type()
 			{
