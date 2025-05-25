@@ -333,6 +333,11 @@ impl Token
 		Token::new(Box::new(IdentifierToken { info, name }))
 	}
 
+	pub fn new_type(info: TokenInfo, vtype: VType) -> Token
+	{
+		Token::new(Box::new(TypeToken { info, vtype }))
+	}
+
 	pub fn new_symbol(info: TokenInfo, sym: Symbol) -> Token
 	{
 		Token::new(Box::new(SymbolToken { info, sym }))
