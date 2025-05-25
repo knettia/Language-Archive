@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
 
+use crate::data::vtype::VType;
 use crate::data::syms::Symbol;
 use crate::data::ops::*;
-// use crate::data::;
+
 use super::token::*;
 
 // enum SyntaxType
@@ -124,6 +125,9 @@ pub fn lex(data: String) -> VecDeque<Token>
 				{
 					"true" => tokens.push_back(Token::new_boolean_literal(info, true)),
 					"false" => tokens.push_back(Token::new_boolean_literal(info, false)),
+
+					"int" => tokens.push_back(Token::new_type(info, VType::Integer)),
+					"bool" => tokens.push_back(Token::new_type(info, VType::Boolean)),
 
 					"and" => tokens.push_back(Token::new_boolean(info, BooleanOperation::And)),
 					"or" => tokens.push_back(Token::new_boolean(info, BooleanOperation::Or)),
