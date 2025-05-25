@@ -312,10 +312,10 @@ pub struct Token
 impl Token
 {
 	// Token functions:
-	// pub fn info(&self) -> TokenInfo
-	// {
-	// 	self.token.info()
-	// }
+	pub fn info(&self) -> TokenInfo
+	{
+		self.token.info()
+	}
 
 	pub fn get_type(&self) -> TokenType
 	{
