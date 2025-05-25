@@ -1,7 +1,9 @@
 use dyn_clone::DynClone;
 use std::any::Any;
 
-use crate::data::{self, syms::{Symbol}};
+use crate::data;
+use crate::data::syms::Symbol;
+use crate::data::vtype::VType;
 
 #[derive(Clone)]
 pub struct TokenInfo
@@ -15,6 +17,7 @@ pub struct TokenInfo
 pub enum TokenType
 {
 	Identifier,
+	Type,
 	Symbol,
 
 	Arithmetic,
@@ -64,6 +67,39 @@ impl IdentifierToken
 	pub fn name(&self) -> String
 	{
 		self.name.clone()
+	}
+}
+
+#[derive(Clone)]
+pub struct TypeToken
+{
+	info: TokenInfo,
+	vtype: VType 
+}
+
+impl TokenTrait for TypeToken
+{
+	fn info(&self) -> TokenInfo
+	{
+		self.info.clone()
+	}
+
+	fn token_type(&self) -> TokenType
+	{
+		TokenType::Type
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl TypeToken
+{
+	pub fn vtype(&self) -> VType
+	{
+		self.vtype.clone()
 	}
 }
 
@@ -276,10 +312,10 @@ pub struct Token
 impl Token
 {
 	// Token functions:
-	pub fn info(&self) -> TokenInfo
-	{
-		self.token.info()
-	}
+	// pub fn info(&self) -> TokenInfo
+	// {
+	// 	self.token.info()
+	// }
 
 	pub fn get_type(&self) -> TokenType
 	{
