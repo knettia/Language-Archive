@@ -12,6 +12,7 @@ use crate::data::ops::BooleanOperation;
 pub enum ExpressionType
 {
 	Literal,
+	Variable,
 	Arithmetic,
 	Comparison,
 	Boolean
@@ -56,6 +57,44 @@ impl LiteralExpression
 	fn new(literal: Literal) -> Self
 	{
 		Self { literal }
+	}
+}
+
+#[derive(Clone)]
+pub struct VariableExpression
+{
+	pub vtype: VType,
+	pub identifier: u16
+}
+
+impl ExpressionTrait for VariableExpression
+{
+	fn virtual_type(&self) -> VType
+	{
+		self.vtype.clone()
+	}
+
+	fn expression_type(&self) -> ExpressionType
+	{
+		ExpressionType::Variable
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl VariableExpression
+{
+	fn new(vtype: VType, identifier: u16) -> Self
+	{
+		Self { vtype, identifier }
+	}
+
+	fn identifier(&self) -> u16
+	{
+		self.identifier
 	}
 }
 
