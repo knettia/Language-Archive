@@ -140,7 +140,6 @@ impl Interpreter
 		}
 	}
 
-
 	pub fn new(root: Root) -> Self
 	{
 		Self { root }
