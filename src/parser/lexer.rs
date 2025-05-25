@@ -157,7 +157,7 @@ pub fn lex(data: String) -> VecDeque<Token>
 				}
 				else 
 				{
-					unimplemented!();
+					tokens.push_back(Token::new_symbol(info, Symbol::Bang));
 				}
 			}
 
