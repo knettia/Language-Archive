@@ -124,8 +124,10 @@ pub fn lex(data: String) -> VecDeque<Token>
 				{
 					"true" => tokens.push_back(Token::new_boolean_literal(info, true)),
 					"false" => tokens.push_back(Token::new_boolean_literal(info, false)),
+
 					"and" => tokens.push_back(Token::new_boolean(info, BooleanOperation::And)),
 					"or" => tokens.push_back(Token::new_boolean(info, BooleanOperation::Or)),
+
 					_ => tokens.push_back(Token::new_identifier(info, ident))
 				}
 			}
@@ -184,16 +186,6 @@ pub fn lex(data: String) -> VecDeque<Token>
 				else
 				{
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsGreater));
-				}
-			}
-
-			'|' =>
-			{
-				if *chars.peek().unwrap() == '|'
-				{
-					tokens.push_back(Token::new_boolean(info, BooleanOperation::Or));
-					chars.next();
-					column += 1;
 				}
 			}
 
