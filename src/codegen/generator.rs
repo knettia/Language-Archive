@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::str::FromStr;
+use std::collections::HashMap;
 
 use inkwell::values::{FunctionValue, PointerValue};
 use inkwell::AddressSpace;
@@ -7,7 +8,8 @@ use inkwell::{
 	context::Context,
 	builder::Builder,
 	module::Module,
-	values::BasicValueEnum
+	values::BasicValueEnum,
+	types::BasicType
 };
 
 use crate::ast::root::*;
@@ -29,7 +31,8 @@ pub struct Generator<'ctx>
 {
 	context: &'ctx Context,
 	builder: Builder<'ctx>,
-	module: Module<'ctx>
+	module: Module<'ctx>,
+	variables: HashMap<u16, PointerValue<'ctx>>
 }
 
 impl<'ctx> Generator<'ctx>
@@ -39,7 +42,7 @@ impl<'ctx> Generator<'ctx>
 		let module = context.create_module(module_name);
 		let builder = context.create_builder();
 
-		Self { context, builder, module }
+		Self { context, builder, module, variables: HashMap::new() }
 	}
 
 	pub fn generate_expression(&self, expression: Expression) -> MetaValue
@@ -67,6 +70,34 @@ impl<'ctx> Generator<'ctx>
 					},
 				}
 			},
+
+			ExpressionType::Variable =>
+			{
+				let variable_expr = expression.as_expression::<VariableExpression>().unwrap();
+				let id = variable_expr.identifier();
+
+				let vtype = variable_expr.vtype();
+
+				let llvm_type = match vtype.clone()
+				{
+					VType::Integer => self.context.i32_type().as_basic_type_enum(),
+					VType::Boolean => self.context.bool_type().as_basic_type_enum()
+				};
+
+
+				let Some(ptr) = self.variables.get(&id) else
+				{
+					panic!("Use of undeclared variable ID {}", id);
+				};
+
+				let loaded_value = self.builder.build_load(llvm_type, *ptr, "loadvar").unwrap();
+
+				return MetaValue
+				{
+					vtype,
+					llvm: loaded_value
+				};
+			}
 
 			ExpressionType::Arithmetic =>
 			{
@@ -380,17 +411,61 @@ impl<'ctx> Generator<'ctx>
 		}
 	}
 
-	pub fn generate_statement(&self, statement: Statement)
+	pub fn generate_statement(&mut self, statement: Statement)
 	{
 		match statement.statement_type()
 		{
 			StatementType::Print =>
 			{
-				let print_stmt = statement.as_statement::<PrintStatement>().unwrap();
+				let print_stmt: &PrintStatement = statement.as_statement::<PrintStatement>().unwrap();
 				let value = self.generate_expression(print_stmt.expression());
 
 				self.generate_printf(value);
+			},
+
+			StatementType::Declare =>
+			{
+				let declare_stmt = statement.as_statement::<DeclareStatement>().unwrap();
+
+				let id = declare_stmt.identifier();
+				let vtype = declare_stmt.vtype();
+				let expr = declare_stmt.expression();
+
+				let value = self.generate_expression(expr);
+
+				if value.vtype != vtype
+				{
+					panic!("Type mismatch in declaration: declared {:?}, got {:?}", vtype, value.vtype);
+				}
+
+				let ptr = match vtype
+				{
+					VType::Integer => self.builder.build_alloca(self.context.i32_type(), "intvar").unwrap(),
+					VType::Boolean => self.builder.build_alloca(self.context.bool_type(), "boolvar").unwrap(),
+				};
+
+				self.builder.build_store(ptr, value.llvm).unwrap();
+				self.variables.insert(id, ptr);
 			}
+
+
+			StatementType::Assign =>
+			{
+				let assign_stmt = statement.as_statement::<AssignStatement>().unwrap();
+
+				let id = assign_stmt.identifier();
+				let expr = assign_stmt.expression();
+
+				let value = self.generate_expression(expr);
+
+				let Some(ptr) = self.variables.get(&id) else
+				{
+					panic!("Assignment to undeclared variable ID {}", id);
+				};
+
+				self.builder.build_store(*ptr, value.llvm).unwrap();
+			}
+
 
 			_ => unimplemented!("Codegen for this statement type is not implemented."),
 		}
@@ -401,7 +476,7 @@ impl<'ctx> Generator<'ctx>
 		self.module.print_to_file(path).expect(format!("Failed to write IR {}", String::from_str(path.to_str().unwrap()).unwrap()).as_str());
 	}
 
-	pub fn generate(&self, root: &Root)
+	pub fn generate(&mut self, root: &Root)
 	{
 		let i32_type = self.context.i32_type();
 		let fn_type = i32_type.fn_type(&[], false);
