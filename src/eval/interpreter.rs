@@ -32,6 +32,8 @@ impl Interpreter
 					VType::Boolean => return Value::new_boolean(literal_expression.literal.as_literal::<BooleanLiteral>().unwrap().value),
 				}
 			}
+
+			ExpressionType::Variable => todo!(),
 			
 			ExpressionType::Arithmetic =>
 			{
