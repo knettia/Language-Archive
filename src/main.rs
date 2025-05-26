@@ -91,7 +91,7 @@ fn main() -> ()
 				let root = parser::parse_root(contents);
 				let context = inkwell::context::Context::create();
 
-				let generator = Generator::new(&context, "main_module");
+				let mut generator = Generator::new(&context, "main_module");
 
 				let ir_path = env::temp_dir().join(format!("{}{}", object_name.to_str().unwrap(), "_temp.ir"));
 				let asm_path = env::temp_dir().join(format!("{}{}", object_name.to_str().unwrap(), "_temp.s"));
