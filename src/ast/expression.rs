@@ -92,7 +92,12 @@ impl VariableExpression
 		Self { vtype, identifier }
 	}
 
-	fn identifier(&self) -> u16
+	pub fn vtype(&self) -> VType
+	{
+		self.vtype.clone()
+	}
+
+	pub fn identifier(&self) -> u16
 	{
 		self.identifier
 	}
@@ -279,6 +284,11 @@ impl Expression
 	pub fn new_literal(literal: Literal) -> Self
 	{
 		Self::new(Box::new(LiteralExpression::new(literal)))
+	}
+	
+	pub fn new_variable(vtype: VType, identifier: u16) -> Self
+	{
+		Self::new(Box::new(VariableExpression::new(vtype, identifier)))
 	}
 
 	pub fn new_arithmetic(vtype: VType, op: ArithmeticOperation, left: Expression, right: Expression) -> Self
