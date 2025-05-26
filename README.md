@@ -4,7 +4,7 @@
 
 # Goals
 - [ ] Advance language
-  - [ ] Create basic variables
+  - [x] Create basic variables
   - [ ] Create `if` and `else` control flows
   - [ ] Create function declarations
   - [ ] Create a module system
