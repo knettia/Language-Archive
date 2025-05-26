@@ -4,6 +4,9 @@ use token::*;
 pub mod lexer;
 use lexer::*;
 
+pub mod symbols_table;
+use symbols_table::*;
+
 use std::collections::VecDeque;
 
 use crate::ast::root::*;
@@ -15,9 +18,8 @@ use crate::data::syms::*;
 use crate::data::ops::*;
 use crate::data::vtype::VType;
 
-
 // Internal operator enum for shunting yard
-fn parse_expression(mut tokens: VecDeque<Token>) -> Expression
+fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token>) -> Expression
 {
 	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 	enum Assoc
@@ -291,7 +293,7 @@ fn parse_expression(mut tokens: VecDeque<Token>) -> Expression
 							panic!("Unclosed parenthesis in expression");
 						}
 
-						let inner_expr = parse_expression(sub_tokens);
+						let inner_expr = parse_expression(symbols_table, sub_tokens);
 						output_stack.push(inner_expr);
 					}
 
@@ -302,6 +304,23 @@ fn parse_expression(mut tokens: VecDeque<Token>) -> Expression
 
 					_ => panic!("Unexpected symbol in expression: {:?}", sym_token.sym())
 				}
+			}
+
+			TokenType::Identifier =>
+			{
+				let ident_token = token.as_token::<IdentifierToken>().unwrap();
+				let name = ident_token.name();
+
+				let id = symbols_table
+					.get_id(&name)
+					.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
+
+				let vtype = symbols_table
+					.lookup(&name)
+					.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
+
+				let var_ref_expr = Expression::new_variable(vtype.clone(), id);
+				output_stack.push(var_ref_expr);
 			}
 
 			_ => panic!("Unexpected token in expression: {:?}", token.get_type())
@@ -325,7 +344,7 @@ pub struct StatementReturn
 	remaining_tokens: VecDeque<Token>,
 }
 
-pub fn parse_statement(stmt_tokens: VecDeque<Token>) -> StatementReturn
+pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<Token>) -> StatementReturn
 {
 	let mut tokens = stmt_tokens.into_iter().peekable();
 
@@ -337,7 +356,116 @@ pub fn parse_statement(stmt_tokens: VecDeque<Token>) -> StatementReturn
 			{
 				let t = t.as_token::<IdentifierToken>().unwrap().clone();
 
-				if t.name() == "print"
+				if t.name() == "let"
+				{
+					// Variable declaration: let <name> <type> = <expr>;
+					let t_name = tokens.next().expect("Expected identifier token after `let`");
+					let t_name = t_name
+						.as_token::<IdentifierToken>()
+						.expect("Expected identifier token")
+						.name();
+
+					let t_type_token = tokens.next().expect(format!("Expected type after identifier `{}`", t_name).as_str());
+					let vtype = t_type_token
+						.as_token::<TypeToken>()
+						.expect("Expected a type token")
+						.vtype();
+
+					let eq_token = tokens.next().expect("Expected '=' after type");
+					let sym = eq_token
+						.as_token::<SymbolToken>()
+						.expect("Expected symbol token for '='")
+						.sym();
+
+					assert_eq!(sym, Symbol::Equal, "Expected '=' symbol after type");
+
+					let mut expr_tokens: VecDeque<Token> = VecDeque::new();
+
+					while let Some(next_token) = tokens.peek()
+					{
+						if next_token.get_type() == TokenType::Symbol
+						{
+							if let Some(sym_token) = next_token.as_token::<SymbolToken>()
+							{
+								if sym_token.sym() == Symbol::Semicolon
+								{
+									tokens.next(); // consume ;
+									break;
+								}
+							}
+						}
+
+						if let Some(tok) = tokens.next()
+						{
+							expr_tokens.push_back(tok);
+						}
+					}
+
+					let expr = parse_expression(symbols_table, expr_tokens);
+
+					symbols_table.define(&t_name, vtype.clone());
+
+					let statement = Statement::new_declare(vtype, symbols_table.get_id(&t_name).unwrap(), expr);
+
+					return StatementReturn
+					{
+						statement,
+						remaining_tokens: tokens.collect()
+					};
+				}
+				else if t.name() == "set"
+				{
+					// Variable assignment: set <name> = <expr>;
+					let t_name = tokens.next().expect("Expected identifier after `set`");
+					let t_name = t_name
+						.as_token::<IdentifierToken>()
+						.expect("Expected identifier token")
+						.name();
+
+					let id = symbols_table
+						.get_id(&t_name)
+						.unwrap_or_else(|| panic!("Symbol `{}` not found in current scope", t_name));
+
+					let eq_token = tokens.next().expect("Expected '=' after identifier");
+					let sym = eq_token
+						.as_token::<SymbolToken>()
+						.expect("Expected symbol token for '='")
+						.sym();
+					assert_eq!(sym, Symbol::Equal, "Expected '=' symbol");
+
+					let mut expr_tokens: VecDeque<Token> = VecDeque::new();
+
+					while let Some(next_token) = tokens.peek()
+					{
+						if next_token.get_type() == TokenType::Symbol
+						{
+							if let Some(sym_token) = next_token.as_token::<SymbolToken>()
+							{
+								if sym_token.sym() == Symbol::Semicolon
+								{
+									tokens.next(); // consume ;
+									break;
+								}
+							}
+						}
+
+						if let Some(tok) = tokens.next()
+						{
+							expr_tokens.push_back(tok);
+						}
+					}
+
+					let expr = parse_expression(symbols_table, expr_tokens);
+
+					let statement = Statement::new_assign(id, expr);
+
+					return StatementReturn
+					{
+						statement,
+						remaining_tokens: tokens.collect()
+					};
+				}
+				else if t.name() == "print"
 				{
 					let mut expr_tokens: VecDeque<Token> = VecDeque::new();
 
@@ -368,7 +496,7 @@ pub fn parse_statement(stmt_tokens: VecDeque<Token>) -> StatementReturn
 						}
 					}
 
-					let expr = parse_expression(expr_tokens);
+					let expr = parse_expression(symbols_table, expr_tokens);
 
 					return StatementReturn
 					{
@@ -396,9 +524,13 @@ pub fn parse_root(source: String) -> Root
 
 	let mut token_queue = tokens.into_iter().collect::<VecDeque<_>>();
 
+	let mut symbols_table = SymbolsTable::new();
+
+	symbols_table.push_scope();
+
 	while !token_queue.is_empty()
 	{
-		let result = parse_statement(token_queue.clone());
+		let result = parse_statement(&mut symbols_table, token_queue.clone());
 
 		root.add(result.statement);
 		token_queue = result.remaining_tokens;
