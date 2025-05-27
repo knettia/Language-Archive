@@ -1,5 +1,5 @@
 use dyn_clone::DynClone;
-use std::any::Any;
+use std::{any::Any, collections::VecDeque};
 
 use crate::data::vtype::VType;
 
@@ -8,9 +8,9 @@ use super::expression::Expression;
 #[derive(Clone)]
 pub enum StatementType
 {
+	Compound,
 	Declare,
 	Assign,
-	Compound,
 	Print
 }
 
@@ -21,6 +21,38 @@ pub trait StatementTrait: DynClone
 }
 
 dyn_clone::clone_trait_object!(StatementTrait);
+
+#[derive(Clone)]
+pub struct CompoundStatement
+{
+	statements: VecDeque<Statement>
+}
+
+impl StatementTrait for CompoundStatement
+{
+	fn statement_type(&self) -> StatementType
+	{
+		StatementType::Compound
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl CompoundStatement
+{
+	pub fn new(statements: VecDeque<Statement>) -> Self
+	{
+		Self { statements }
+	}
+
+	pub fn statements(&self) -> VecDeque<Statement>
+	{
+		self.statements.clone()
+	}
+}
 
 #[derive(Clone)]
 pub struct DeclareStatement
@@ -159,6 +191,11 @@ impl Statement
 		Self { statement }
 	}
 
+	pub fn new_compound(statements: VecDeque<Statement>) -> Self
+	{
+		Self::new(Box::new(CompoundStatement::new(statements)))
+	}
+	
 	pub fn new_declare(vtype: VType, identifier: u16, expression: Expression) -> Self
 	{
 		Self::new(Box::new(DeclareStatement::new(vtype, identifier, expression)))
