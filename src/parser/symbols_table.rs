@@ -96,6 +96,11 @@ impl SymbolsTable
 		}
 	}
 
+	pub fn scope(&self) -> usize
+	{
+		self.scopes.len()
+	}
+
 	pub fn lookup(&self, name: &str) -> Option<&VType>
 	{
 		let scope = self.scopes.front()?;
