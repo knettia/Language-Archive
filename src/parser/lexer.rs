@@ -203,6 +203,16 @@ pub fn lex(data: String) -> VecDeque<Token>
 				tokens.push_back(Token::new_symbol(info, Symbol::RightParen));
 			}
 
+			'{' =>
+			{
+				tokens.push_back(Token::new_symbol(info, Symbol::LeftBrace));
+			}
+
+			'}' =>
+			{
+				tokens.push_back(Token::new_symbol(info, Symbol::RightBrace));
+			}
+
 			';' =>
 			{
 				tokens.push_back(Token::new_symbol(info, Symbol::Semicolon));
