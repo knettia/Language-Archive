@@ -415,6 +415,16 @@ impl<'ctx> Generator<'ctx>
 	{
 		match statement.statement_type()
 		{
+			StatementType::Compound =>
+			{
+				let compound_stmt = statement.as_statement::<CompoundStatement>().unwrap();
+
+				for stmt in compound_stmt.statements()
+				{
+					self.generate_statement(stmt);
+				}
+			},
+
 			StatementType::Print =>
 			{
 				let print_stmt: &PrintStatement = statement.as_statement::<PrintStatement>().unwrap();
