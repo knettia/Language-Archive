@@ -6,5 +6,8 @@ pub enum Symbol
 	Semicolon,
 
 	LeftParen,
-	RightParen
+	RightParen,
+
+	LeftBrace,
+	RightBrace
 }
