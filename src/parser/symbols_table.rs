@@ -80,7 +80,6 @@ impl SymbolsTable
 		self.scopes.push_front(new_scope);
 	}
 
-	#[allow(dead_code)] // Will use pop_scope in the future
 	pub fn pop_scope(&mut self)
 	{
 		self.scopes.pop_front();
