@@ -352,6 +352,70 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 	{
 		match t.get_type()
 		{
+			token::TokenType::Symbol =>
+			{
+				let t = t.as_token::<SymbolToken>().unwrap().clone();
+
+				if t.sym() != Symbol::LeftBrace
+				{
+					panic!("Unexpected token `{:?}`", t.sym());
+				}
+
+				let mut depth = 1;
+				let mut sub_tokens: VecDeque<Token> = VecDeque::new();
+
+				while let Some(next_token) = tokens.next()
+				{
+					if next_token.get_type() == TokenType::Symbol
+					{
+						let sub_sym_token = next_token.as_token::<SymbolToken>().unwrap();
+
+						match sub_sym_token.sym()
+						{
+							Symbol::LeftBrace => depth += 1,
+							Symbol::RightBrace =>
+							{
+								depth -= 1;
+								if depth == 0
+								{
+									break;
+								}
+							}
+							_ => {}
+						}
+					}
+
+					sub_tokens.push_back(next_token);
+				}
+
+				if depth != 0
+				{
+					panic!("Unclosed brace");
+				}
+
+				symbols_table.push_scope();
+
+				let mut statements = VecDeque::new();
+
+				while !sub_tokens.is_empty()
+				{
+					let result = parse_statement(symbols_table, sub_tokens.clone());
+
+					statements.push_back(result.statement);
+					sub_tokens = result.remaining_tokens;
+				}
+				
+				symbols_table.pop_scope();
+
+				let statement = Statement::new_compound(statements);
+
+				return StatementReturn
+				{
+					statement,
+					remaining_tokens: tokens.collect()
+				};
+			},
+
 			token::TokenType::Identifier =>
 			{
 				let t = t.as_token::<IdentifierToken>().unwrap().clone();
