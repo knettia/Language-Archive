@@ -22,10 +22,19 @@ impl Scope
 			HashMap::new()
 		};
 
+		let id_to_type = if let Some(p) = parent
+		{
+			p.id_to_type.clone()
+		}
+		else
+		{
+			HashMap::new()
+		};
+
 		Self
 		{
 			name_to_id,
-			id_to_type: HashMap::new()
+			id_to_type
 		}
 	}
 
