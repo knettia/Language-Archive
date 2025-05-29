@@ -1,12 +1,12 @@
 # farenc
 
-"farenc" is a test project for a small, compiled programming language called "Faren"
+"farenc" is a personal test project for a small, compiled programming language called "Faren". Its purpose is to test compiler design from scratch.
 
 # Goals
 - [ ] Advance language
   - [x] Create basic variables
   - [ ] Create `if` and `else` control flows
-  - [ ] Create function declarations
+  - [x] Create function declarations
   - [ ] Create a module system
 - [ ] Compile freestanding binaries
   - [ ] Binaries that do not rely on `libc` or `clang`
@@ -15,30 +15,54 @@
   - [ ] Allow multiple objects to link to eachother
 - [ ] Create Ruby tests for compiling using `RSpec`
 
-# Test
 
-### To compile the executable:
+# Requirements:
+- [Rust](https://www.rust-lang.org/)
+- [`cargo`](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+- LLVM 16 or later
+- [Inkwell](https://github.com/TheDan64/inkwell)
+
+# Compiling `farenc`:
+Build `farenc` like the following:
 
 ```sh
-cargo build
+cargo build --release
 ```
 
-### To test:
+# Setup:
 
-Interpreting:
+Before using `farenc`, export its required environment variables using the following script:
 
 ```sh
-cargo run -- interpret source.script
+chmod +x set-export.sh
+./set-export.sh
 ```
 
-Compiling:
+Alternatively:
+
 ```sh
-cargo run -- compile source.script -o object.o
-cargo run -- compile object.o -x exec
+sh set-export.sh
 ```
 
-You can also output artifacts when building objects:
+# Using `farenc`:
+
+
+Compiling `.faren` source files into relocatable object files:
 
 ```sh
-cargo run -- compile source.script -o object.o --artifacts
+farenc source.faren -o source.o
+```
+
+Linking Faren relocatable object files into an executable binary:
+
+```sh
+farenc source.o -o source
+```
+
+You can also expose artifacts during compilation with the following flags:
+
+```sh
+farenc source.faren -o source.o \
+	--dump-ir source.ll \
+	--dump-asm source.S
 ```
