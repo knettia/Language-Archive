@@ -344,7 +344,7 @@ pub struct StatementReturn
 	remaining_tokens: VecDeque<Token>,
 }
 
-pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<Token>) -> StatementReturn
+pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<Token>, manage_scope: bool) -> StatementReturn
 {
 	let mut tokens = stmt_tokens.into_iter().peekable();
 
@@ -393,19 +393,26 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 					panic!("Unclosed brace");
 				}
 
-				symbols_table.push_scope();
+
+				if manage_scope
+				{
+					symbols_table.push_scope();
+				}
 
 				let mut statements = VecDeque::new();
 
 				while !sub_tokens.is_empty()
 				{
-					let result = parse_statement(symbols_table, sub_tokens.clone());
+					let result = parse_statement(symbols_table, sub_tokens.clone(), true);
 
 					statements.push_back(result.statement);
 					sub_tokens = result.remaining_tokens;
 				}
 				
-				symbols_table.pop_scope();
+				if manage_scope
+				{
+					symbols_table.pop_scope();
+				}
 
 				let statement = Statement::new_compound(statements);
 
@@ -467,6 +474,8 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let mut parameter_types = VecDeque::new();
 					let mut parameters = VecDeque::new();
+
+					symbols_table.push_scope();
 					
 					while let Some(sub_token) = iter_sub_token.next()
 					{
@@ -497,18 +506,12 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						parameter_types.push_back(param_vtype);
 					}
 
-					let func_type = VType::Function
-					{
-						parameters: parameter_types,
-						return_type: Box::new(vtype.clone())
-					};
+					symbols_table.define_function(&t_name, vtype.clone(), parameter_types);
 
-					symbols_table.define(&t_name, func_type);
-
-					let result = parse_statement(symbols_table, tokens.clone().collect());
+					let result = parse_statement(symbols_table, tokens.clone().collect(), false);
 
 					let func_declare_statement = Statement::new_function_declare(
-						symbols_table.get_id(&t_name).unwrap(),
+						t_name,
 						parameters,
 						vtype.clone(),
 						result.statement
@@ -516,6 +519,8 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							.expect("Expected compoind statement")
 							.clone()
 						);
+					
+					symbols_table.pop_scope();
 
 					return StatementReturn
 					{
@@ -751,7 +756,7 @@ pub fn parse_root(source: String) -> Root
 
 	while !token_queue.is_empty()
 	{
-		let result = parse_statement(&mut symbols_table, token_queue.clone());
+		let result = parse_statement(&mut symbols_table, token_queue.clone(), true);
 
 		root.add(result.statement);
 		token_queue = result.remaining_tokens;
