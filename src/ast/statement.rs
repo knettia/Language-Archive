@@ -8,6 +8,9 @@ use super::expression::Expression;
 #[derive(Clone)]
 pub enum StatementType
 {
+	FunctionDeclare,
+	FunctionReturn,
+
 	Compound,
 	Declare,
 	Assign,
@@ -21,6 +24,113 @@ pub trait StatementTrait: DynClone
 }
 
 dyn_clone::clone_trait_object!(StatementTrait);
+
+#[derive(Clone)]
+pub struct Parameter
+{
+	id: u16,
+	vtype: VType
+}
+
+impl Parameter
+{
+	pub fn new(id: u16, vtype: VType) -> Self
+	{
+		Self { id, vtype }
+	}
+
+	pub fn id(&self) -> u16
+	{
+		self.id
+	}
+
+	pub fn vtype(&self) -> VType
+	{
+		self.vtype.clone()
+	}
+}
+
+#[derive(Clone)]
+pub struct FunctionDeclareStatement
+{
+	name: String,
+	parameters: VecDeque<Parameter>,
+	return_type: VType,
+	body: CompoundStatement
+}
+
+impl StatementTrait for FunctionDeclareStatement
+{
+	fn statement_type(&self) -> StatementType
+	{
+		StatementType::FunctionDeclare
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl FunctionDeclareStatement
+{
+	pub fn new(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
+	{
+		Self { name: id, parameters, return_type, body }
+	}
+
+	pub fn name(&self) -> String
+	{
+		self.name.clone()
+	}
+
+	pub fn parameters(&self) -> VecDeque<Parameter>
+	{
+		self.parameters.clone()
+	}
+
+	pub fn return_type(&self) -> VType
+	{
+		self.return_type.clone()
+	}
+
+	pub fn body(&self) -> CompoundStatement
+	{
+		self.body.clone()
+	}
+}
+
+#[derive(Clone)]
+pub struct FunctionReturnStatement
+{
+	expression: Expression
+}
+
+impl StatementTrait for FunctionReturnStatement
+{
+	fn statement_type(&self) -> StatementType
+	{
+		StatementType::FunctionReturn
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl FunctionReturnStatement
+{
+	pub fn new(expression: Expression) -> Self
+	{
+		Self { expression }
+	}
+
+	pub fn expression(&self) -> Expression
+	{
+		self.expression.clone()
+	}
+}
 
 #[derive(Clone)]
 pub struct CompoundStatement
@@ -189,6 +299,16 @@ impl Statement
 	pub fn new(statement: StatementBox) -> Self
 	{
 		Self { statement }
+	}
+
+	pub fn new_function_declare(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
+	{
+		Self::new(Box::new(FunctionDeclareStatement::new(id, parameters, return_type, body)))
+	}
+
+	pub fn new_function_return(expression: Expression) -> Self
+	{
+		Self::new(Box::new(FunctionReturnStatement::new(expression)))
 	}
 
 	pub fn new_compound(statements: VecDeque<Statement>) -> Self
