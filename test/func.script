@@ -1,0 +1,10 @@
+
+function square int(x int)
+{
+	return x * x;
+}
+
+function entry int()
+{
+	return 0;
+}
