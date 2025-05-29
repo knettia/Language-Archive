@@ -31,17 +31,24 @@ cargo build --release
 
 # Setup:
 
-Before using `farenc`, export its required environment variables using the following script:
+Before using `farenc`, you must export its required environment variables. You will have to run `set-export.sh`:
+
+Making `set-export.sh` executable:
 
 ```sh
 chmod +x set-export.sh
-./set-export.sh
+```
+
+Running `set-export.sh`:
+
+```sh
+source ./set-export.sh
 ```
 
 Alternatively:
 
 ```sh
-sh set-export.sh
+. ./set-export.sh
 ```
 
 # Using `farenc`:
