@@ -1,6 +1,6 @@
-# Language Archive
+# farenc
 
-"Language Archive" is a test project for a small programming language that is both compiled and interpreted
+"farenc" is a test project for a small, compiled programming language called "Faren"
 
 # Goals
 - [ ] Advance language
