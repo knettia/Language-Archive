@@ -51,6 +51,70 @@ impl<'ctx> Generator<'ctx>
 	{
 		match expression.expression_type()
 		{
+			ExpressionType::FunctionCall =>
+			{
+				let function_call_expression = expression.as_expression::<FunctionCallExpression>().unwrap();
+
+				let function_name = function_call_expression.name();
+
+				let llvm_function = self.module.get_function(&function_name)
+					.unwrap_or_else(|| panic!("Function `{}` not found in module", function_name));
+
+				let passed_arguments = function_call_expression.passed_arguments();
+
+				let mut llvm_args = Vec::new();
+
+				for arg_expr in passed_arguments
+				{
+					let meta_arg = self.generate_expression(arg_expr);
+
+					let llvm_value = match meta_arg.vtype
+					{
+						VType::Integer | VType::Boolean =>
+						{
+							meta_arg.llvm.into_int_value().into()
+						}
+					};
+
+					llvm_args.push(llvm_value);
+				}
+
+				let call_site = self.builder.build_call(
+					llvm_function,
+					&llvm_args,
+					"calltmp"
+				).unwrap();
+
+				let return_type = function_call_expression.virtual_type();
+
+				let return_value = match return_type
+				{
+					VType::Integer =>
+					{
+						let value = call_site.try_as_basic_value().left()
+							.expect("Expected integer return from function");
+						MetaValue
+						{
+							vtype: VType::Integer,
+							llvm: value
+						}
+					}
+
+					VType::Boolean =>
+					{
+						let value = call_site.try_as_basic_value().left()
+							.expect("Expected boolean return from function");
+						MetaValue
+						{
+							vtype: VType::Boolean,
+							llvm: value
+						}
+					}
+				};
+
+				return return_value;
+			}
+
 			ExpressionType::Literal =>
 			{
 				let literal_expression = expression.as_expression::<LiteralExpression>().unwrap();
@@ -476,6 +540,16 @@ impl<'ctx> Generator<'ctx>
 				let value = self.generate_expression(return_expr);
 
 				self.builder.build_return(Some(&value.llvm)).unwrap();
+			}
+
+			StatementType::Expression =>
+			{
+				let expr_stmt = statement.as_statement::<ExpressionStatement>().unwrap();
+
+				let expr = expr_stmt.expression();
+
+				let value = self.generate_expression(expr);
+				let _ = value; // discard value
 			}
 
 			StatementType::Compound =>
