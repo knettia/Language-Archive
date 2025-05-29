@@ -1,5 +1,6 @@
 use dyn_clone::DynClone;
 use std::any::Any;
+use std::collections::VecDeque;
 
 use super::literal::Literal;
 
@@ -12,6 +13,7 @@ use crate::data::ops::BooleanOperation;
 pub enum ExpressionType
 {
 	Literal,
+	FunctionCall,
 	Variable,
 	Arithmetic,
 	Comparison,
@@ -57,6 +59,50 @@ impl LiteralExpression
 	fn new(literal: Literal) -> Self
 	{
 		Self { literal }
+	}
+}
+
+#[derive(Clone)]
+pub struct FunctionCallExpression
+{
+	pub vtype: VType,
+	pub name: String,
+	pub passed_arguments: VecDeque<Expression>
+}
+
+impl ExpressionTrait for FunctionCallExpression
+{
+	fn virtual_type(&self) -> VType
+	{
+		self.vtype.clone()
+	}
+
+	fn expression_type(&self) -> ExpressionType
+	{
+		ExpressionType::FunctionCall
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl FunctionCallExpression
+{
+	fn new(vtype: VType, name: String, passed_arguments: VecDeque<Expression>) -> Self
+	{
+		Self { vtype, name, passed_arguments }
+	}
+
+	pub fn name(&self) -> String
+	{
+		self.name.clone()
+	}
+
+	pub fn passed_arguments(&self) -> VecDeque<Expression>
+	{
+		self.passed_arguments.clone()
 	}
 }
 
@@ -279,6 +325,11 @@ impl Expression
 	pub fn new(expression: ExpressionBox) -> Self
 	{
 		Self { expression }
+	}
+
+	pub fn new_function_call(vtype: VType, name: String, passed_arguments: VecDeque<Expression>) -> Self
+	{
+		Self::new(Box::new(FunctionCallExpression::new(vtype, name, passed_arguments)))
 	}
 
 	pub fn new_literal(literal: Literal) -> Self
