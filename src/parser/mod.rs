@@ -827,6 +827,50 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						remaining_tokens: tokens.collect()
 					}
 				}
+				else if t.name() == "express"
+				{
+					if symbols_table.scope() == 1
+					{
+						panic!("Cannot express in root scope");
+					}
+
+					let mut expr_tokens: VecDeque<Token> = VecDeque::new();
+
+					loop
+					{
+						let Some(next_token) = tokens.peek() else
+						{
+							break;
+						};
+
+						if next_token.get_type() == TokenType::Symbol
+						{
+							let sym_token_opt = next_token.as_token::<SymbolToken>();
+
+							if let Some(sym_token) = sym_token_opt
+							{
+								if sym_token.sym() == Symbol::Semicolon
+								{
+									tokens.next(); // consume ;
+									break;
+								}
+							}
+						}
+
+						if let Some(token) = tokens.next()
+						{
+							expr_tokens.push_back(token);
+						}
+					}
+
+					let expr = parse_expression(symbols_table, expr_tokens);
+
+					return StatementReturn
+					{
+						statement: Statement::new_expression(expr),
+						remaining_tokens: tokens.collect()
+					}
+				}
 				else
 				{
 					panic!("Unexpected identifier `{}`", t.name());
