@@ -3,6 +3,8 @@ pub enum Symbol
 {
 	Bang,	
 	Equal,
+
+	Comma,
 	Semicolon,
 
 	LeftParen,
