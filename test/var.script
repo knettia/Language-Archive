@@ -1,9 +1,0 @@
-let hello int = 10;
-
-print hello;
-print hello / 2 == 10;
-
-set hello = 20;
-
-print hello;
-print hello / 2 == 10;

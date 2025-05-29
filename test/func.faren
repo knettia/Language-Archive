@@ -4,7 +4,7 @@ function square int(x int)
 	return x * x;
 }
 
-function entry int()
+function main int()
 {
 	return 0;
 }

@@ -1,0 +1,10 @@
+function main int()
+{
+	print (100 * 5) / 20;
+	print 10 < 20;
+
+	print 1 + 2 * 3 == 7;
+	print true and false or true;
+
+	return 0;
+}
