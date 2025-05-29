@@ -55,9 +55,19 @@ impl Scope
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct FunctionInfo
+{
+	pub name: String,
+	pub return_type: VType,
+	pub parameter_types: VecDeque<VType>
+}
+
 #[derive(Debug)]
 pub struct SymbolsTable
 {
+	functions: HashMap<String, FunctionInfo>,
+
 	scopes: VecDeque<Scope>,
 	next_id: u16
 }
@@ -68,9 +78,37 @@ impl SymbolsTable
 	{
 		Self
 		{
+			functions: HashMap::new(),
 			scopes: VecDeque::new(),
 			next_id: 0
 		}
+	}
+
+	pub fn define_function(&mut self, name: &str, return_type: VType, parameter_types: VecDeque<VType>)
+	{
+		let info = FunctionInfo
+		{
+			name: name.to_string(),
+			return_type,
+			parameter_types
+		};
+
+		if self.functions.contains_key(name)
+		{
+			panic!("Function {} already defined", name);
+		}
+
+		self.functions.insert(name.to_string(), info);
+	}
+
+	pub fn get_function(&self, name: &str) -> Option<&FunctionInfo>
+	{
+		self.functions.get(name)
+	}
+
+	pub fn get_function_mut(&mut self, name: &str) -> Option<&mut FunctionInfo>
+	{
+		self.functions.get_mut(name)
 	}
 
 	pub fn push_scope(&mut self)
