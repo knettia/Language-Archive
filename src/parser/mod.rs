@@ -311,16 +311,113 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 				let ident_token = token.as_token::<IdentifierToken>().unwrap();
 				let name = ident_token.name();
 
-				let id = symbols_table
-					.get_id(&name)
-					.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
+				if name == "invoke"
+				{
+					let function_name = tokens.pop_front()
+						.unwrap()
+						.as_token::<IdentifierToken>()
+						.expect("Token after `invoke` should be a function name")
+						.name();
 
-				let vtype = symbols_table
-					.lookup(&name)
-					.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
+					let function_info = symbols_table
+						.get_function(&function_name)
+						.unwrap_or_else(|| panic!("Undefined function: `{}`", name));
 
-				let var_ref_expr = Expression::new_variable(vtype.clone(), id);
-				output_stack.push(var_ref_expr);
+					let vtype = function_info.return_type.clone();
+					
+					let t_leftparen = tokens.pop_front().expect("Expected `(` after type in function declaration");
+					let t_leftparen = t_leftparen.as_token::<SymbolToken>().expect("Expected `(` after type in function declaration");
+					if t_leftparen.sym() != Symbol::LeftParen
+					{
+						panic!("Expected `(` after function return type");
+					}
+
+					let mut depth = 1;
+					let mut sub_tokens = VecDeque::new();
+
+					while let Some(next_token) = tokens.pop_front()
+					{
+						if next_token.get_type() == TokenType::Symbol
+						{
+							let sub_sym_token = next_token.as_token::<SymbolToken>().unwrap();
+
+							match sub_sym_token.sym()
+							{
+								Symbol::LeftParen => depth += 1,
+								Symbol::RightParen =>
+								{
+									depth -= 1;
+									if depth == 0
+									{
+										break;
+									}
+								}
+								_ => {}
+							}
+						}
+
+						sub_tokens.push_back(next_token);
+					}
+
+					if depth != 0
+					{
+						panic!("Unclosed parenthesis in expression");
+					}
+
+					let mut expressions_passed: VecDeque<VecDeque<Token>> = VecDeque::new();
+					let mut current_expression = VecDeque::new();
+
+					while let Some(sub_token) = sub_tokens.pop_front()
+					{
+						if sub_token.get_type() == TokenType::Symbol
+						{
+							let sym = sub_token.as_token::<SymbolToken>().expect("Expected symbol token").sym();
+							if sym == Symbol::Comma
+							{
+								expressions_passed.push_back(current_expression.clone());
+								current_expression.clear();
+								continue;
+							}
+						}
+
+						current_expression.push_back(sub_token);
+					}
+
+					if current_expression.len() != 0
+					{
+						expressions_passed.push_back(current_expression);
+					}
+
+					if expressions_passed.len() != function_info.parameter_types.len()
+					{
+						panic!("Mismatched arguments, expected {}, got {}", function_info.parameter_types.len(), expressions_passed.len());
+					}
+
+					let mut passed_arguments = VecDeque::new();
+
+					for expr_tokens in expressions_passed
+					{
+						let expr = parse_expression(symbols_table, expr_tokens);
+						passed_arguments.push_back(expr);
+					}
+
+					let function_call_expr = Expression::new_function_call(vtype, function_name, passed_arguments);
+					output_stack.push(function_call_expr);
+				}
+				else
+				{
+					let id = symbols_table
+						.get_id(&name)
+						.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
+	
+					let vtype = symbols_table
+						.lookup(&name)
+						.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
+	
+					let var_ref_expr = Expression::new_variable(vtype.clone(), id);
+					output_stack.push(var_ref_expr);
+				}
+
 			}
 
 			_ => panic!("Unexpected token in expression: {:?}", token.get_type())
