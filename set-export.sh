@@ -1,5 +1,12 @@
 #!/bin/sh
+# INFO: this script assumes you are using
+#       bash or zsh
 
-C_PATH="./target/debug"
+FARENC_PATH_DEBUG="./target/debug"
+FARENC_PATH_RELEASE="./target/release"
 
-export PATH="$C_PATH:$PATH"
+# export debug path
+export PATH="$FARENC_PATH_DEBUG:$PATH"
+
+# export release path
+export PATH="$FARENC_PATH_RELEASE:$PATH"
