@@ -2,6 +2,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::collections::HashMap;
 
+use inkwell::types::BasicMetadataTypeEnum;
 use inkwell::values::{FunctionValue, PointerValue};
 use inkwell::AddressSpace;
 use inkwell::{
@@ -33,6 +34,7 @@ pub struct Generator<'ctx>
 	builder: Builder<'ctx>,
 	module: Module<'ctx>,
 	variables: HashMap<u16, PointerValue<'ctx>>
+	// current_function_return_type: Option<VType>,
 }
 
 impl<'ctx> Generator<'ctx>
@@ -67,7 +69,7 @@ impl<'ctx> Generator<'ctx>
 						let bool_val = literal_expression.literal.as_literal::<BooleanLiteral>().unwrap().value;
 						let llvm_bool = self.context.bool_type().const_int(if bool_val { 1 } else { 0 }, false);
 						return MetaValue { vtype: VType::Boolean, llvm: llvm_bool.into()};
-					},
+					}
 				}
 			},
 
@@ -406,8 +408,7 @@ impl<'ctx> Generator<'ctx>
 
 				let args = vec![format_str.into(), selected_str.unwrap().into()];
 				self.builder.build_call(printf_fn, &args, "printf_call").unwrap();
-			},
-
+			}
 		}
 	}
 
@@ -415,6 +416,68 @@ impl<'ctx> Generator<'ctx>
 	{
 		match statement.statement_type()
 		{
+			StatementType::FunctionDeclare =>
+			{
+				let func_stmt = statement.as_statement::<FunctionDeclareStatement>().unwrap();
+
+				let id = func_stmt.name();
+				let vtype = func_stmt.return_type();
+				let parameters = func_stmt.parameters();
+				let llvm_return = match vtype.clone()
+				{
+					VType::Integer => self.context.i32_type().as_basic_type_enum(),
+					VType::Boolean => self.context.bool_type().as_basic_type_enum()
+				};
+
+				let llvm_params: Vec<BasicMetadataTypeEnum> = parameters
+					.iter()
+					.map(|vt|
+					{
+						match vt.vtype()
+						{
+							VType::Integer => self.context.i32_type().as_basic_type_enum().into(),
+							VType::Boolean => self.context.bool_type().as_basic_type_enum().into()
+						}
+					})
+					.collect();
+
+				let fn_type = llvm_return.fn_type(&llvm_params[..], false);
+				let fn_val = self.module.add_function(&id, fn_type, None);
+				let entry_block = self.context.append_basic_block(fn_val, "entry");
+				self.builder.position_at_end(entry_block);
+
+				let old_variables = std::mem::take(&mut self.variables);
+
+				for (i, param) in parameters.iter().enumerate()
+				{
+					let param_value = fn_val.get_nth_param(i as u32).unwrap();
+
+					let ptr = match param.vtype()
+					{
+						VType::Integer => self.builder.build_alloca(self.context.i32_type(), "arg_int").unwrap(),
+						VType::Boolean => self.builder.build_alloca(self.context.bool_type(), "arg_bool").unwrap()
+					};
+
+					self.builder.build_store(ptr, param_value).unwrap();
+					self.variables.insert(param.id(), ptr);
+				}
+
+				self.generate_statement(Statement::new(Box::new(func_stmt.body())));
+
+				self.variables = old_variables;
+			}
+
+			StatementType::FunctionReturn =>
+			{
+				let return_stmt = statement.as_statement::<FunctionReturnStatement>().unwrap();
+
+				let return_expr = return_stmt.expression();
+
+				let value = self.generate_expression(return_expr);
+
+				self.builder.build_return(Some(&value.llvm)).unwrap();
+			}
+
 			StatementType::Compound =>
 			{
 				let compound_stmt = statement.as_statement::<CompoundStatement>().unwrap();
@@ -451,7 +514,7 @@ impl<'ctx> Generator<'ctx>
 				let ptr = match vtype
 				{
 					VType::Integer => self.builder.build_alloca(self.context.i32_type(), "intvar").unwrap(),
-					VType::Boolean => self.builder.build_alloca(self.context.bool_type(), "boolvar").unwrap(),
+					VType::Boolean => self.builder.build_alloca(self.context.bool_type(), "boolvar").unwrap()
 				};
 
 				self.builder.build_store(ptr, value.llvm).unwrap();
@@ -476,8 +539,7 @@ impl<'ctx> Generator<'ctx>
 				self.builder.build_store(*ptr, value.llvm).unwrap();
 			}
 
-
-			_ => unimplemented!("Codegen for this statement type is not implemented."),
+			// _ => unimplemented!("Codegen for this statement type is not implemented."),
 		}
 	}
 
@@ -488,18 +550,18 @@ impl<'ctx> Generator<'ctx>
 
 	pub fn generate(&mut self, root: &Root)
 	{
-		let i32_type = self.context.i32_type();
-		let fn_type = i32_type.fn_type(&[], false);
-		let function = self.module.add_function("main", fn_type, None);
-		let basic_block = self.context.append_basic_block(function, "entry");
+		// let i32_type = self.context.i32_type();
+		// let fn_type = i32_type.fn_type(&[], false);
+		// let function = self.module.add_function("main", fn_type, None);
+		// let basic_block = self.context.append_basic_block(function, "entry");
 
-		self.builder.position_at_end(basic_block);
+		// self.builder.position_at_end(basic_block);
 
 		for stmt in root.statements.clone()
 		{
 			self.generate_statement(stmt);
 		}
 
-		self.builder.build_return(Some(&self.context.i32_type().const_int(0, true))).unwrap();
+		// self.builder.build_return(Some(&self.context.i32_type().const_int(0, true))).unwrap();
 	}
 }
