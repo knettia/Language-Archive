@@ -126,6 +126,7 @@ pub fn lex(data: String) -> VecDeque<Token>
 					"true" => tokens.push_back(Token::new_boolean_literal(info, true)),
 					"false" => tokens.push_back(Token::new_boolean_literal(info, false)),
 
+					"void" => tokens.push_back(Token::new_type(info, VType::Void)),
 					"int" => tokens.push_back(Token::new_type(info, VType::Integer)),
 					"bool" => tokens.push_back(Token::new_type(info, VType::Boolean)),
 
@@ -135,7 +136,6 @@ pub fn lex(data: String) -> VecDeque<Token>
 					_ => tokens.push_back(Token::new_identifier(info, ident))
 				}
 			}
-
 
 			'=' =>
 			{
