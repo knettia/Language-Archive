@@ -1,0 +1,7 @@
+function square_c int(x int);
+
+function main int()
+{
+	print invoke square_c(25);
+	return 0;
+}

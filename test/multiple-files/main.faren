@@ -1,0 +1,7 @@
+function square_faren int(x int);
+
+function main int()
+{
+	print invoke square_faren(4);
+	return 0;
+}

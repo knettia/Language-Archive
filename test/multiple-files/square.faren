@@ -1,0 +1,4 @@
+function square_faren int(x int)
+{
+	return x * x;
+}
