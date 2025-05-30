@@ -22,11 +22,7 @@ use crate::ast::literal::*;
 use crate::data::vtype::VType;
 use crate::data::ops::*;
 
-pub struct MetaValue<'ctx>
-{
-	pub vtype: VType,
-	pub llvm: Option<BasicValueEnum<'ctx>>
-}
+use super::meta_value::MetaValue;
 
 pub struct Generator<'ctx>
 {
