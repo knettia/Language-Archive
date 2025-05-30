@@ -6,6 +6,7 @@
 - [ ] Advance language
   - [x] Create basic variables
   - [ ] Create `if` and `else` control flows
+  - [ ] Create `while` and `loop` control flows
   - [x] Create function declarations
   - [ ] Create a module system
 - [ ] Compile freestanding binaries
@@ -57,19 +58,19 @@ Alternatively:
 Compiling `.faren` source files into relocatable object files:
 
 ```sh
-farenc source.faren -o source.o
+farenc -s source.faren -o source.o
 ```
 
 Linking Faren relocatable object files into an executable binary:
 
 ```sh
-farenc source.o -o source
+farenc -s source.o -o source
 ```
 
 You can also expose artifacts during compilation with the following flags:
 
 ```sh
-farenc source.faren -o source.o \
+farenc -s source.faren -o source.o \
 	--dump-ir source.ll \
 	--dump-asm source.S
 ```
