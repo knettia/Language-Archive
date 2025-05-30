@@ -1,3 +1,8 @@
+function print_num void(x int)
+{
+	print x;
+	return;
+}
 
 function square int(x int)
 {
@@ -6,5 +11,8 @@ function square int(x int)
 
 function main int()
 {
+	express invoke print_num(10);
+	print invoke square((4 + 1) * 3);
+
 	return 0;
 }
