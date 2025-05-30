@@ -3,7 +3,7 @@ use std::{any::Any, collections::VecDeque};
 
 use crate::data::vtype::VType;
 
-use super::expression::{self, Expression, ExpressionBox};
+use super::expression::Expression;
 
 #[derive(Clone)]
 pub enum StatementType
@@ -105,7 +105,7 @@ impl FunctionDeclareStatement
 #[derive(Clone)]
 pub struct FunctionReturnStatement
 {
-	expression: Expression
+	expression: Option<Expression>
 }
 
 impl StatementTrait for FunctionReturnStatement
@@ -123,12 +123,12 @@ impl StatementTrait for FunctionReturnStatement
 
 impl FunctionReturnStatement
 {
-	pub fn new(expression: Expression) -> Self
+	pub fn new(expression: Option<Expression>) -> Self
 	{
 		Self { expression }
 	}
 
-	pub fn expression(&self) -> Expression
+	pub fn expression(&self) -> Option<Expression>
 	{
 		self.expression.clone()
 	}
@@ -312,7 +312,6 @@ impl PrintStatement
 	}
 }
 
-
 pub type StatementBox = Box<dyn StatementTrait>;
 
 #[derive(Clone)]
@@ -340,7 +339,7 @@ impl Statement
 		Self::new(Box::new(FunctionDeclareStatement::new(id, parameters, return_type, body)))
 	}
 
-	pub fn new_function_return(expression: Expression) -> Self
+	pub fn new_function_return(expression: Option<Expression>) -> Self
 	{
 		Self::new(Box::new(FunctionReturnStatement::new(expression)))
 	}
