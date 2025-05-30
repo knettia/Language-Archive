@@ -606,7 +606,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let result = parse_statement(symbols_table, tokens.clone().collect(), false);
 
-					let func_declare_statement = Statement::new_function_declare(
+					let func_declare_statement = Statement::new_function_define(
 						t_name,
 						parameters,
 						vtype.clone(),

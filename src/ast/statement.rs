@@ -8,7 +8,7 @@ use super::expression::Expression;
 #[derive(Clone)]
 pub enum StatementType
 {
-	FunctionDeclare,
+	FunctionDefine,
 	FunctionReturn,
 
 	Expression,
@@ -53,7 +53,7 @@ impl Parameter
 }
 
 #[derive(Clone)]
-pub struct FunctionDeclareStatement
+pub struct FunctionDefineStatement
 {
 	name: String,
 	parameters: VecDeque<Parameter>,
@@ -61,11 +61,11 @@ pub struct FunctionDeclareStatement
 	body: CompoundStatement
 }
 
-impl StatementTrait for FunctionDeclareStatement
+impl StatementTrait for FunctionDefineStatement
 {
 	fn statement_type(&self) -> StatementType
 	{
-		StatementType::FunctionDeclare
+		StatementType::FunctionDefine
 	}
 
 	fn as_any(&self) -> &dyn Any
@@ -74,7 +74,7 @@ impl StatementTrait for FunctionDeclareStatement
 	}
 }
 
-impl FunctionDeclareStatement
+impl FunctionDefineStatement
 {
 	pub fn new(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
 	{
@@ -334,9 +334,9 @@ impl Statement
 		Self { statement }
 	}
 
-	pub fn new_function_declare(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
+	pub fn new_function_define(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
 	{
-		Self::new(Box::new(FunctionDeclareStatement::new(id, parameters, return_type, body)))
+		Self::new(Box::new(FunctionDefineStatement::new(id, parameters, return_type, body)))
 	}
 
 	pub fn new_function_return(expression: Option<Expression>) -> Self

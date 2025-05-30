@@ -2,14 +2,13 @@ use std::path::Path;
 use std::str::FromStr;
 use std::collections::HashMap;
 
-use inkwell::types::{AnyType, BasicMetadataTypeEnum};
+use inkwell::types::{BasicMetadataTypeEnum};
 use inkwell::values::{FunctionValue, PointerValue};
 use inkwell::AddressSpace;
 use inkwell::{
 	context::Context,
 	builder::Builder,
 	module::Module,
-	values::BasicValueEnum,
 	types::BasicType
 };
 
@@ -30,7 +29,6 @@ pub struct Generator<'ctx>
 	builder: Builder<'ctx>,
 	module: Module<'ctx>,
 	variables: HashMap<u16, PointerValue<'ctx>>
-	// current_function_return_type: Option<VType>,
 }
 
 impl<'ctx> Generator<'ctx>
@@ -493,9 +491,9 @@ impl<'ctx> Generator<'ctx>
 	{
 		match statement.statement_type()
 		{
-			StatementType::FunctionDeclare =>
+			StatementType::FunctionDefine =>
 			{
-				let func_stmt = statement.as_statement::<FunctionDeclareStatement>().unwrap();
+				let func_stmt = statement.as_statement::<FunctionDefineStatement>().unwrap();
 
 				let id = func_stmt.name();
 				let vtype = func_stmt.return_type();
