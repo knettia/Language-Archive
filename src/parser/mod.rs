@@ -434,7 +434,6 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 	output_stack.pop().unwrap()
 }
 
-
 pub struct StatementReturn
 {
 	statement: Statement,
@@ -661,7 +660,16 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						}
 					}
 
-					let expr = parse_expression(symbols_table, expr_tokens);
+					let expr;
+
+					if expr_tokens.len() == 0
+					{
+						expr = None;
+					}
+					else
+					{
+						expr = Some(parse_expression(symbols_table, expr_tokens))
+					}
 
 					return StatementReturn
 					{
@@ -683,6 +691,11 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						.as_token::<TypeToken>()
 						.expect("Expected a type token")
 						.vtype();
+
+					if vtype == VType::Void
+					{
+						panic!("Variable has invalid void type");
+					}
 
 					let eq_token = tokens.next().expect("Expected '=' after type");
 					let sym = eq_token
