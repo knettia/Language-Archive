@@ -29,17 +29,21 @@ fn exit_error(msg: &str) -> !
 	process::exit(1);
 }
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[command(author, version, about = "The Faren compiler frontend.")]
 struct Cli
 {
 	/// Input file (.faren or .o)
-	#[arg(short = 's', long)]
-	source: String,
+	#[arg(short = 's', long, required = true)]
+	sources: Vec<String>,
 
 	/// Output file (.o or executable)
 	#[arg(short = 'o', long)]
 	output: String,
+
+	/// Link Archive Static library to an output file
+	#[arg(long)]
+	link_archive: Option<Vec<String>>,
 
 	/// Dump LLVM IR to specified file
 	#[arg(long)]
@@ -50,61 +54,153 @@ struct Cli
 	dump_asm: Option<String>,
 }
 
+enum OutputType
+{
+	Relocatable,
+	Executable,
+	Archive
+}
+
 fn main() -> ()
 {
 	let cli = Cli::parse();
 
-	let input_ext = Path::new(&cli.source)
-		.extension()
-		.and_then(|e| e.to_str())
-		.unwrap_or("");
+	let mut object_files = Vec::new();
 
 	let output_ext = Path::new(&cli.output)
 		.extension()
 		.and_then(|e| e.to_str())
 		.unwrap_or("");
 
-	match (input_ext, output_ext)
+	let output_type = match output_ext
 	{
-		("faren", "o") | ("faren", "out") =>
+		"o" => OutputType::Relocatable,
+		"" | "out" => OutputType::Executable,
+		"a" => OutputType::Archive,
+		_ => exit_error(&format!("unknown output extension: `.{}`", output_ext))
+	};
+
+	for source in &cli.sources
+	{
+		let input_ext = Path::new(&source)
+			.extension()
+			.and_then(|e| e.to_str())
+			.unwrap_or("");
+		
+		match input_ext
 		{
-			compile_to_object(&cli);
-		},
-
-		("faren", _) =>
-		{
-			let object_name = Path::new(&cli.source)
-				.file_stem()
-				.unwrap()
-				.to_str()
-				.unwrap();
-
-			let tmp_obj = env::temp_dir().join(format!("faren-unnamed-tmp-{}.o", object_name));
-
-			let mut tmp_cli = Cli::parse();
-			tmp_cli.output = tmp_obj.to_str().unwrap().to_string();
-			compile_to_object(&tmp_cli);
-
-			link_object(&tmp_cli.output, &cli.output);
-
-			fs::remove_file(&tmp_obj).unwrap();
-		},
-
-		("o", _) | ("out", _) =>
-		{
-			link_object(&cli.source, &cli.output);
-		},
-
-		_ =>
-		{
-			if input_ext != "faren" && (input_ext != "o" && input_ext != "out")
+			"faren" | "frn" | "fn" =>
 			{
-				exit_error(&format!("unknown source file type `.{}`", input_ext))
+				let object_name = Path::new(source)
+					.file_stem()
+					.unwrap()
+					.to_str()
+					.unwrap();
+
+				let object_path = env::temp_dir().join(format!("faren-unnamed-{}.o", object_name));
+				let mut tmp_cli = cli.clone();
+
+				tmp_cli.sources = vec![source.clone()];
+				tmp_cli.output = object_path.to_str().unwrap().to_string();
+
+				compile_to_object(source.clone(), object_path.to_str().unwrap().to_string(), cli.dump_ir.clone(), cli.dump_asm.clone());
+				object_files.push(tmp_cli.output.clone());
+			},
+
+			"o" =>
+			{
+				object_files.push(source.clone());
+			},
+
+			ext =>
+			{
+				exit_error(&format!("unknown input extension: `.{}`", ext));
+			}
+		}
+	}
+
+	link_objects(object_files, cli.output, output_type, cli.link_archive);
+}
+
+fn link_objects(object_paths: Vec<String>, output_path: String, output_type: OutputType, linked_archives: Option<Vec<String>>)
+{
+	match output_type
+	{
+		OutputType::Relocatable =>
+		{
+			let mut command = process::Command::new("ld");
+			command.arg("-r");
+
+			for obj in &object_paths
+			{
+				command.arg(obj);
 			}
 
-			if (output_ext != "o" && output_ext != "out") && output_ext != ""
+			command.arg("-o").arg(&output_path);
+
+			let status = command.status().unwrap_or_else(|err|
 			{
-				exit_error(&format!("unknown output file type `.{}`", output_ext))
+				exit_error(&format!("invoking `ld -r` failed: {}", err));
+			});
+
+			if !status.success()
+			{
+				exit_error("`ld -r` failed.");
+			}
+		},
+
+		OutputType::Executable =>
+		{
+			let mut command = process::Command::new("clang");
+
+			for obj in &object_paths
+			{
+				command.arg(obj);
+			}
+
+			if let Some(archives) = &linked_archives
+			{
+				command.arg("-Wl,--start-group");
+
+				for archive in archives
+				{
+					command.arg(archive);
+				}
+
+				command.arg("-Wl,--end-group");
+			}
+
+			command.arg("-o").arg(&output_path);
+
+			let status = command.status().unwrap_or_else(|err|
+			{
+				exit_error(&format!("invoking `clang` failed: {}", err));
+			});
+
+			if !status.success()
+			{
+				exit_error("`clang` failed.");
+			}
+		}
+
+
+		OutputType::Archive =>
+		{
+			let mut command = process::Command::new("ar");
+
+			let mut args = vec!["rcs".to_string(), output_path.clone()];
+			args.extend(object_paths.clone());
+
+			command.args(args);
+
+			let status = command.status().unwrap_or_else(|err|
+			{
+				exit_error(&format!("invoking `ar` failed: {}", err));
+			});
+
+			if !status.success()
+			{
+				exit_error("`ar` failed.");
 			}
 		}
 	}
@@ -119,30 +215,25 @@ fn read_file_or_exit(path: &str) -> String
 		})
 }
 
-fn compile_to_object(cli: &Cli)
+fn compile_to_object(source: String, output: String, dump_ir: Option<String>, dump_asm: Option<String>)
 {
-	let object_name = Path::new(&cli.source)
+	let object_name = Path::new(&source)
 		.file_stem()
 		.unwrap()
 		.to_str()
 		.unwrap();
 
 	let context = inkwell::context::Context::create();
-	let contents = read_file_or_exit(&cli.source);
+	let contents = read_file_or_exit(&source);
 	let root = parser::parse_root(contents);
 
 	let mut generator = Generator::new(&context, "main_module");
 	generator.generate(&root);
 
-	let ir_path = env::temp_dir().join(format!("faren-unnamed-tmp-{}.ll", object_name));
-	let asm_path = env::temp_dir().join(format!("faren-unnamed-tmp-{}.s", object_name));
+	let ir_path = env::temp_dir().join(format!("faren-unnamed-{}.ll", object_name));
+	let asm_path = env::temp_dir().join(format!("faren-unnamed-{}.S", object_name));
 
 	generator.write_to_file(ir_path.as_path());
-
-	if let Some(ir_out) = &cli.dump_ir
-	{
-		fs::copy(&ir_path, ir_out).unwrap();
-	}
 
 	let llc_status = process::Command::new("llc")
 		.arg("-opaque-pointers")
@@ -160,15 +251,10 @@ fn compile_to_object(cli: &Cli)
 		exit_error("`llc` failed.");
 	}
 
-	if let Some(asm_out) = &cli.dump_asm
-	{
-		fs::copy(&asm_path, asm_out).unwrap();
-	}
-
 	let as_status = process::Command::new("as")
 		.arg(asm_path.to_str().unwrap())
 		.arg("-o")
-		.arg(&cli.output)
+		.arg(&output)
 		.status()
 		.unwrap_or_else(|err|
 		{
@@ -180,11 +266,9 @@ fn compile_to_object(cli: &Cli)
 		exit_error("`as` failed.");
 	}
 
-	if cli.dump_ir.is_some()
+	if let Some(ir_out) = &dump_ir
 	{
-		let path = cli.dump_ir.clone().unwrap();
-
-		let ext = Path::new(&path)
+		let ext = Path::new(&ir_out)
 			.extension()
 			.and_then(|e| e.to_str())
 			.unwrap_or("");
@@ -194,7 +278,7 @@ fn compile_to_object(cli: &Cli)
 			record_warning("IR artifact extension is not `.ll`");
 		}
 
-		let err = fs::copy(&ir_path, path.clone());
+		let err = fs::copy(&ir_path, ir_out.clone());
 
 		if err.is_err()
 		{
@@ -202,11 +286,9 @@ fn compile_to_object(cli: &Cli)
 		}
 	}
 	
-	if cli.dump_asm.is_some()
+	if let Some(asm_out) = &dump_asm
 	{
-		let path = cli.dump_asm.clone().unwrap();
-
-		let ext = Path::new(&path)
+		let ext = Path::new(&asm_out)
 			.extension()
 			.and_then(|e| e.to_str())
 			.unwrap_or("");
@@ -216,7 +298,7 @@ fn compile_to_object(cli: &Cli)
 			record_warning("ASM artifact extension is not `.S`");
 		}
 
-		let err = fs::copy(&asm_path, path.clone());
+		let err = fs::copy(&asm_path, asm_out.clone());
 
 		if err.is_err()
 		{
@@ -226,23 +308,4 @@ fn compile_to_object(cli: &Cli)
 
 	fs::remove_file(&ir_path).unwrap();
 	fs::remove_file(&asm_path).unwrap();
-}
-
-fn link_object(obj_path: &str, output_path: &str)
-{
-	let status = process::Command::new("clang")
-		.arg(obj_path)
-		.arg("-o")
-		.arg(output_path)
-		.status()
-		.unwrap_or_else(|err|
-		{
-			exit_error(&format!("invoking `clang` failed: {}", err));
-		});
-
-
-	if !status.success()
-	{
-		exit_error("`clang` failed.");
-	}
 }
