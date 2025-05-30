@@ -9,6 +9,7 @@ use super::expression::Expression;
 pub enum StatementType
 {
 	FunctionDefine,
+	FunctionDeclare,
 	FunctionReturn,
 
 	Expression,
@@ -99,6 +100,50 @@ impl FunctionDefineStatement
 	pub fn body(&self) -> CompoundStatement
 	{
 		self.body.clone()
+	}
+}
+
+#[derive(Clone)]
+pub struct FunctionDeclareStatement
+{
+	name: String,
+	parameters: VecDeque<Parameter>,
+	return_type: VType
+}
+
+impl StatementTrait for FunctionDeclareStatement
+{
+	fn statement_type(&self) -> StatementType
+	{
+		StatementType::FunctionDeclare
+	}
+
+	fn as_any(&self) -> &dyn Any
+	{
+		self
+	}
+}
+
+impl FunctionDeclareStatement
+{
+	pub fn new(id: String, parameters: VecDeque<Parameter>, return_type: VType) -> Self
+	{
+		Self { name: id, parameters, return_type }
+	}
+
+	pub fn name(&self) -> String
+	{
+		self.name.clone()
+	}
+
+	pub fn parameters(&self) -> VecDeque<Parameter>
+	{
+		self.parameters.clone()
+	}
+
+	pub fn return_type(&self) -> VType
+	{
+		self.return_type.clone()
 	}
 }
 
@@ -337,6 +382,11 @@ impl Statement
 	pub fn new_function_define(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
 	{
 		Self::new(Box::new(FunctionDefineStatement::new(id, parameters, return_type, body)))
+	}
+
+	pub fn new_function_declare(id: String, parameters: VecDeque<Parameter>, return_type: VType) -> Self
+	{
+		Self::new(Box::new(FunctionDeclareStatement::new(id, parameters, return_type)))
 	}
 
 	pub fn new_function_return(expression: Option<Expression>) -> Self

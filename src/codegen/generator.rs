@@ -556,6 +556,48 @@ impl<'ctx> Generator<'ctx>
 				self.variables = old_variables;
 			}
 
+			StatementType::FunctionDeclare =>
+			{
+				let func_stmt = statement.as_statement::<FunctionDeclareStatement>().unwrap();
+
+				let id = func_stmt.name();
+				let vtype = func_stmt.return_type();
+				let parameters = func_stmt.parameters();
+
+				let llvm_params: Vec<BasicMetadataTypeEnum> = parameters
+					.iter()
+					.map(|vt|
+					{
+						match vt.vtype()
+						{
+							VType::Void => panic!(),
+							VType::Integer => self.context.i32_type().as_basic_type_enum().into(),
+							VType::Boolean => self.context.bool_type().as_basic_type_enum().into()
+						}
+					})
+					.collect();
+
+				let fn_type = match vtype.clone()
+				{
+					VType::Void =>
+					{
+						self.context.void_type().fn_type(&llvm_params[..], false)
+					},
+
+					VType::Integer =>
+					{
+						self.context.i32_type().fn_type(&llvm_params[..], false)
+					},
+
+					VType::Boolean =>
+					{
+						self.context.bool_type().fn_type(&llvm_params[..], false)
+					}
+				};
+
+				self.module.add_function(&id, fn_type, None);
+			}
+
 			StatementType::FunctionReturn =>
 			{
 				let return_stmt = statement.as_statement::<FunctionReturnStatement>().unwrap();

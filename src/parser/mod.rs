@@ -604,25 +604,56 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					symbols_table.define_function(&t_name, vtype.clone(), parameter_types);
 
-					let result = parse_statement(symbols_table, tokens.clone().collect(), false);
+					let next_token = tokens.peek().expect("Tokens should not stop here");
+					let token_sym = next_token.as_token::<SymbolToken>()
+						.expect("Token after function statement should be a symbol")
+						.sym();
 
-					let func_declare_statement = Statement::new_function_define(
-						t_name,
-						parameters,
-						vtype.clone(),
-						result.statement
-							.as_statement::<CompoundStatement>()
-							.expect("Expected compoind statement")
-							.clone()
-						);
-					
-					symbols_table.pop_scope();
-
-					return StatementReturn
+					if token_sym == Symbol::Semicolon
 					{
-						statement: func_declare_statement,
-						remaining_tokens: result.remaining_tokens.clone()
-					};
+						tokens.next(); // consume ;
+						symbols_table.pop_scope();
+
+						let func_declare_statement = Statement::new_function_declare(t_name, parameters, vtype.clone());
+
+						return StatementReturn
+						{
+							statement: func_declare_statement,
+							remaining_tokens: tokens.collect()
+						}
+					}
+					else if token_sym == Symbol::LeftBrace
+					{
+						let result = parse_statement(symbols_table, tokens.clone().collect(), false);
+	
+						let func_declare_statement = Statement::new_function_define(
+							t_name,
+							parameters,
+							vtype.clone(),
+							result.statement
+								.as_statement::<CompoundStatement>()
+								.expect("Expected compoind statement")
+								.clone()
+							);
+						
+						symbols_table.pop_scope();
+	
+						return StatementReturn
+						{
+							statement: func_declare_statement,
+							remaining_tokens: result.remaining_tokens.clone()
+						};
+					}
+					else
+					{
+						panic!("Unexpected token symbol {:?} after function statement, expected {:?} or {:?}. L{}:C{}",
+							token_sym,
+							Symbol::Semicolon,
+							Symbol::LeftBrace,
+							next_token.info().line,
+							next_token.info().column
+						);
+					}
 				}
 				else if t.name() == "return"
 				{
