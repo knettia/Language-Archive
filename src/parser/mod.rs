@@ -16,7 +16,7 @@ use crate::ast::expression::*;
 
 use crate::data::syms::*;
 use crate::data::ops::*;
-use crate::data::vtype::VType;
+use crate::data::vtype::*;
 
 // Internal operator enum for shunting yard
 fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token>) -> Expression
@@ -323,7 +323,7 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 						.get_function(&function_name)
 						.unwrap_or_else(|| panic!("Undefined function: `{}`", name));
 
-					let vtype = function_info.return_type.clone();
+					let vtype = function_info.return_type().clone();
 					
 					let t_leftparen = tokens.pop_front().expect("Expected `(` after type in function declaration");
 					let t_leftparen = t_leftparen.as_token::<SymbolToken>().expect("Expected `(` after type in function declaration");
@@ -388,9 +388,9 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 						expressions_passed.push_back(current_expression);
 					}
 
-					if expressions_passed.len() != function_info.parameter_types.len()
+					if expressions_passed.len() != function_info.parameters().len()
 					{
-						panic!("Mismatched arguments, expected {}, got {}", function_info.parameter_types.len(), expressions_passed.len());
+						panic!("Mismatched arguments, expected {}, got {}", function_info.parameters().len(), expressions_passed.len());
 					}
 
 					let mut passed_arguments = VecDeque::new();
@@ -536,14 +536,8 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						.expect("Expected identifier token after `function`")
 						.name();
 
-					let t_type_token = tokens.next().expect(format!("Expected type after function identifier `{}`", t_name).as_str());
-					let vtype = t_type_token
-						.as_token::<TypeToken>()
-						.expect(format!("Expected type after function identifier `{}`", t_name).as_str())
-						.vtype();
-
-					let t_leftparen = tokens.next().expect("Expected `(` after type in function declaration");
-					let t_leftparen = t_leftparen.as_token::<SymbolToken>().expect("Expected `(` after type in function declaration");
+					let next_token = tokens.next().expect("Tokens should not stop here");
+					let t_leftparen = next_token.as_token::<SymbolToken>().expect("This should not happen");
 					if t_leftparen.sym() != Symbol::LeftParen
 					{
 						panic!("Expected `(` after function return type");
@@ -568,7 +562,6 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let mut iter_sub_token = sub_tokens.into_iter().peekable();
 
-					let mut parameter_types = VecDeque::new();
 					let mut parameters = VecDeque::new();
 
 					symbols_table.push_scope();
@@ -599,10 +592,15 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 						let param = Parameter::new(symbols_table.get_id(&param_id).unwrap(), param_vtype.clone());
 						parameters.push_back(param);
-						parameter_types.push_back(param_vtype);
 					}
 
-					symbols_table.define_function(&t_name, vtype.clone(), parameter_types);
+					let t_type_token = tokens.next().expect(format!("Expected type after function identifier `{}`", t_name).as_str());
+					let vtype = t_type_token
+						.as_token::<TypeToken>()
+						.expect(format!("Expected type after function identifier `{}`", t_name).as_str())
+						.vtype();
+
+					symbols_table.define_function(&t_name, vtype.clone(), parameters.clone());
 
 					let next_token = tokens.peek().expect("Tokens should not stop here");
 					let token_sym = next_token.as_token::<SymbolToken>()
@@ -614,7 +612,8 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						tokens.next(); // consume ;
 						symbols_table.pop_scope();
 
-						let func_declare_statement = Statement::new_function_declare(t_name, parameters, vtype.clone());
+						let func_sign = FunctionSignature::new(t_name, vtype.clone(), parameters);
+						let func_declare_statement = Statement::new_function_declare(func_sign);
 
 						return StatementReturn
 						{
@@ -626,13 +625,13 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 					{
 						let result = parse_statement(symbols_table, tokens.clone().collect(), false);
 	
+						let func_sign = FunctionSignature::new(t_name, vtype.clone(), parameters);
+
 						let func_declare_statement = Statement::new_function_define(
-							t_name,
-							parameters,
-							vtype.clone(),
+							func_sign,
 							result.statement
 								.as_statement::<CompoundStatement>()
-								.expect("Expected compoind statement")
+								.expect("Expected compound statement")
 								.clone()
 							);
 						
