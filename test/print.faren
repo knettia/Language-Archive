@@ -1,4 +1,4 @@
-function main int()
+function main() int
 {
 	print (100 * 5) / 20;
 	print 10 < 20;

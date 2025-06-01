@@ -1,15 +1,15 @@
-function print_num void(x int)
+function print_num (x int) void
 {
 	print x;
 	return;
 }
 
-function square int(x int)
+function square (x int) int
 {
 	return x * x;
 }
 
-function main int()
+function main () int
 {
 	express invoke print_num(10);
 	print invoke square((4 + 1) * 3);

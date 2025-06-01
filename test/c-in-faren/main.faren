@@ -1,6 +1,6 @@
-function square_c int(x int);
+function square_c (x int) int;
 
-function main int()
+function main () int
 {
 	print invoke square_c(25);
 	return 0;
