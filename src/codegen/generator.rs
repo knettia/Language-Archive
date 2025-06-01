@@ -2,24 +2,39 @@ use std::path::Path;
 use std::str::FromStr;
 use std::collections::HashMap;
 
-use inkwell::types::{BasicMetadataTypeEnum};
-use inkwell::values::{FunctionValue, PointerValue};
-use inkwell::AddressSpace;
-use inkwell::{
+use inkwell::
+{
+	AddressSpace,
 	context::Context,
 	builder::Builder,
 	module::Module,
-	types::BasicType
+
+	values::
+	{
+		FunctionValue,
+		PointerValue
+	},
+
+	types::
+	{
+		BasicType,
+		FunctionType
+	}
 };
 
-use crate::ast::root::*;
+use crate::ast::
+{
+	root::*,
+	statement::*,
+	expression::*,
+	literal::*,
+};
 
-use crate::ast::statement::*;
-use crate::ast::expression::*;
-use crate::ast::literal::*;
-
-use crate::data::vtype::VType;
-use crate::data::ops::*;
+use crate::data::
+{
+	vtype::*,
+	ops::*
+};
 
 use super::meta_value::MetaValue;
 
@@ -487,6 +502,52 @@ impl<'ctx> Generator<'ctx>
 		}
 	}
 
+	pub fn get_function_type(&self, signature: &FunctionSignature) -> FunctionType<'ctx>
+	{
+		let vtype = signature.return_type();
+		let parameters = signature.parameters();
+
+		let llvm_params;
+
+		if parameters.len() > 0
+		{
+			llvm_params = parameters
+				.iter()
+				.map(|vt|
+				{
+					match vt.vtype()
+					{
+						VType::Void => panic!(),
+						VType::Integer => self.context.i32_type().as_basic_type_enum().into(),
+						VType::Boolean => self.context.bool_type().as_basic_type_enum().into()
+					}
+				})
+				.collect();
+		}
+		else
+		{
+			llvm_params = vec![];
+		}
+
+		match vtype.clone()
+		{
+			VType::Void =>
+			{
+				self.context.void_type().fn_type(&llvm_params[..], false)
+			},
+
+			VType::Integer =>
+			{
+				self.context.i32_type().fn_type(&llvm_params[..], false)
+			},
+
+			VType::Boolean =>
+			{
+				self.context.bool_type().fn_type(&llvm_params[..], false)
+			}
+		}
+	}
+
 	pub fn generate_statement(&mut self, statement: Statement)
 	{
 		match statement.statement_type()
@@ -494,61 +555,35 @@ impl<'ctx> Generator<'ctx>
 			StatementType::FunctionDefine =>
 			{
 				let func_stmt = statement.as_statement::<FunctionDefineStatement>().unwrap();
+				let func_sign = func_stmt.signature();
 
-				let id = func_stmt.name();
-				let vtype = func_stmt.return_type();
-				let parameters = func_stmt.parameters();
+				let func_type = self.get_function_type(&func_sign);
+				let func_val = self.module.add_function(&func_sign.name(), func_type, None);
 
-				let llvm_params: Vec<BasicMetadataTypeEnum> = parameters
-					.iter()
-					.map(|vt|
+				
+				let entry_block = self.context.append_basic_block(func_val, "entry");
+				self.builder.position_at_end(entry_block);
+				
+				let old_variables = std::mem::take(&mut self.variables);
+				
+				let func_params = func_sign.parameters();
+
+				if func_params.len() > 0
+				{
+					for (i, param) in func_params.iter().enumerate()
 					{
-						match vt.vtype()
+						let param_value = func_val.get_nth_param(i as u32).unwrap();
+
+						let ptr = match param.vtype()
 						{
 							VType::Void => panic!(),
-							VType::Integer => self.context.i32_type().as_basic_type_enum().into(),
-							VType::Boolean => self.context.bool_type().as_basic_type_enum().into()
-						}
-					})
-					.collect();
+							VType::Integer => self.builder.build_alloca(self.context.i32_type(), "arg_int").unwrap(),
+							VType::Boolean => self.builder.build_alloca(self.context.bool_type(), "arg_bool").unwrap()
+						};
 
-				let fn_type = match vtype.clone()
-				{
-					VType::Void =>
-					{
-						self.context.void_type().fn_type(&llvm_params[..], false)
-					},
-
-					VType::Integer =>
-					{
-						self.context.i32_type().fn_type(&llvm_params[..], false)
-					},
-
-					VType::Boolean =>
-					{
-						self.context.bool_type().fn_type(&llvm_params[..], false)
+						self.builder.build_store(ptr, param_value).unwrap();
+						self.variables.insert(param.id(), ptr);
 					}
-				};
-
-				let fn_val = self.module.add_function(&id, fn_type, None);
-				let entry_block = self.context.append_basic_block(fn_val, "entry");
-				self.builder.position_at_end(entry_block);
-
-				let old_variables = std::mem::take(&mut self.variables);
-
-				for (i, param) in parameters.iter().enumerate()
-				{
-					let param_value = fn_val.get_nth_param(i as u32).unwrap();
-
-					let ptr = match param.vtype()
-					{
-						VType::Void => panic!(),
-						VType::Integer => self.builder.build_alloca(self.context.i32_type(), "arg_int").unwrap(),
-						VType::Boolean => self.builder.build_alloca(self.context.bool_type(), "arg_bool").unwrap()
-					};
-
-					self.builder.build_store(ptr, param_value).unwrap();
-					self.variables.insert(param.id(), ptr);
 				}
 
 				self.generate_statement(Statement::new(Box::new(func_stmt.body())));
@@ -559,43 +594,11 @@ impl<'ctx> Generator<'ctx>
 			StatementType::FunctionDeclare =>
 			{
 				let func_stmt = statement.as_statement::<FunctionDeclareStatement>().unwrap();
+				let func_sign = func_stmt.signature();
 
-				let id = func_stmt.name();
-				let vtype = func_stmt.return_type();
-				let parameters = func_stmt.parameters();
+				let func_type = self.get_function_type(&func_sign);
 
-				let llvm_params: Vec<BasicMetadataTypeEnum> = parameters
-					.iter()
-					.map(|vt|
-					{
-						match vt.vtype()
-						{
-							VType::Void => panic!(),
-							VType::Integer => self.context.i32_type().as_basic_type_enum().into(),
-							VType::Boolean => self.context.bool_type().as_basic_type_enum().into()
-						}
-					})
-					.collect();
-
-				let fn_type = match vtype.clone()
-				{
-					VType::Void =>
-					{
-						self.context.void_type().fn_type(&llvm_params[..], false)
-					},
-
-					VType::Integer =>
-					{
-						self.context.i32_type().fn_type(&llvm_params[..], false)
-					},
-
-					VType::Boolean =>
-					{
-						self.context.bool_type().fn_type(&llvm_params[..], false)
-					}
-				};
-
-				self.module.add_function(&id, fn_type, None);
+				self.module.add_function(&func_sign.name(), func_type, None);
 			}
 
 			StatementType::FunctionReturn =>
