@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
-use crate::data::vtype::VType;
+use crate::data::vtype::*;
 
 #[derive(Debug, Clone)]
 pub struct Scope
@@ -55,18 +55,10 @@ impl Scope
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct FunctionInfo
-{
-	pub name: String,
-	pub return_type: VType,
-	pub parameter_types: VecDeque<VType>
-}
-
 #[derive(Debug)]
 pub struct SymbolsTable
 {
-	functions: HashMap<String, FunctionInfo>,
+	functions: HashMap<String, FunctionSignature>,
 
 	scopes: VecDeque<Scope>,
 	next_id: u16
@@ -84,14 +76,9 @@ impl SymbolsTable
 		}
 	}
 
-	pub fn define_function(&mut self, name: &str, return_type: VType, parameter_types: VecDeque<VType>)
+	pub fn define_function(&mut self, name: &str, return_type: VType, parameters: VecDeque<Parameter>)
 	{
-		let info = FunctionInfo
-		{
-			name: name.to_string(),
-			return_type,
-			parameter_types
-		};
+		let info = FunctionSignature::new(name.to_string(), return_type, parameters);
 
 		if self.functions.contains_key(name)
 		{
@@ -101,14 +88,9 @@ impl SymbolsTable
 		self.functions.insert(name.to_string(), info);
 	}
 
-	pub fn get_function(&self, name: &str) -> Option<&FunctionInfo>
+	pub fn get_function(&self, name: &str) -> Option<&FunctionSignature>
 	{
 		self.functions.get(name)
-	}
-
-	pub fn get_function_mut(&mut self, name: &str) -> Option<&mut FunctionInfo>
-	{
-		self.functions.get_mut(name)
 	}
 
 	pub fn push_scope(&mut self)

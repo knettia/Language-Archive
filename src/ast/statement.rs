@@ -1,7 +1,7 @@
 use dyn_clone::DynClone;
 use std::{any::Any, collections::VecDeque};
 
-use crate::data::vtype::VType;
+use crate::data::vtype::*;
 
 use super::expression::Expression;
 
@@ -29,36 +29,9 @@ pub trait StatementTrait: DynClone
 dyn_clone::clone_trait_object!(StatementTrait);
 
 #[derive(Clone)]
-pub struct Parameter
-{
-	id: u16,
-	vtype: VType
-}
-
-impl Parameter
-{
-	pub fn new(id: u16, vtype: VType) -> Self
-	{
-		Self { id, vtype }
-	}
-
-	pub fn id(&self) -> u16
-	{
-		self.id
-	}
-
-	pub fn vtype(&self) -> VType
-	{
-		self.vtype.clone()
-	}
-}
-
-#[derive(Clone)]
 pub struct FunctionDefineStatement
 {
-	name: String,
-	parameters: VecDeque<Parameter>,
-	return_type: VType,
+	signature: FunctionSignature,
 	body: CompoundStatement
 }
 
@@ -77,24 +50,14 @@ impl StatementTrait for FunctionDefineStatement
 
 impl FunctionDefineStatement
 {
-	pub fn new(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
+	pub fn new(signature: FunctionSignature, body: CompoundStatement) -> Self
 	{
-		Self { name: id, parameters, return_type, body }
+		Self { signature, body }
 	}
 
-	pub fn name(&self) -> String
+	pub fn signature(&self) -> FunctionSignature
 	{
-		self.name.clone()
-	}
-
-	pub fn parameters(&self) -> VecDeque<Parameter>
-	{
-		self.parameters.clone()
-	}
-
-	pub fn return_type(&self) -> VType
-	{
-		self.return_type.clone()
+		self.signature.clone()
 	}
 
 	pub fn body(&self) -> CompoundStatement
@@ -106,9 +69,7 @@ impl FunctionDefineStatement
 #[derive(Clone)]
 pub struct FunctionDeclareStatement
 {
-	name: String,
-	parameters: VecDeque<Parameter>,
-	return_type: VType
+	signature: FunctionSignature
 }
 
 impl StatementTrait for FunctionDeclareStatement
@@ -126,24 +87,14 @@ impl StatementTrait for FunctionDeclareStatement
 
 impl FunctionDeclareStatement
 {
-	pub fn new(id: String, parameters: VecDeque<Parameter>, return_type: VType) -> Self
+	pub fn new(signature: FunctionSignature) -> Self
 	{
-		Self { name: id, parameters, return_type }
+		Self { signature }
 	}
 
-	pub fn name(&self) -> String
+	pub fn signature(&self) -> FunctionSignature
 	{
-		self.name.clone()
-	}
-
-	pub fn parameters(&self) -> VecDeque<Parameter>
-	{
-		self.parameters.clone()
-	}
-
-	pub fn return_type(&self) -> VType
-	{
-		self.return_type.clone()
+		self.signature.clone()
 	}
 }
 
@@ -379,14 +330,14 @@ impl Statement
 		Self { statement }
 	}
 
-	pub fn new_function_define(id: String, parameters: VecDeque<Parameter>, return_type: VType, body: CompoundStatement) -> Self
+	pub fn new_function_define(signature: FunctionSignature, body: CompoundStatement) -> Self
 	{
-		Self::new(Box::new(FunctionDefineStatement::new(id, parameters, return_type, body)))
+		Self::new(Box::new(FunctionDefineStatement::new(signature, body)))
 	}
 
-	pub fn new_function_declare(id: String, parameters: VecDeque<Parameter>, return_type: VType) -> Self
+	pub fn new_function_declare(signature: FunctionSignature) -> Self
 	{
-		Self::new(Box::new(FunctionDeclareStatement::new(id, parameters, return_type)))
+		Self::new(Box::new(FunctionDeclareStatement::new(signature)))
 	}
 
 	pub fn new_function_return(expression: Option<Expression>) -> Self
