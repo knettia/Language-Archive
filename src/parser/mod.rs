@@ -9,14 +9,18 @@ use symbols_table::*;
 
 use std::collections::VecDeque;
 
-use crate::ast::root::*;
-use crate::ast::statement::*;
-use crate::ast::literal::*;
-use crate::ast::expression::*;
+use crate::ast::{
+	root::*,
+	statement::*,
+	literal::*,
+	expression::*
+};
 
-use crate::data::syms::*;
-use crate::data::ops::*;
-use crate::data::vtype::*;
+use crate::data::{
+	syms::*,
+	ops::*,
+	vtype::*
+};
 
 // Internal operator enum for shunting yard
 fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token>) -> Expression
