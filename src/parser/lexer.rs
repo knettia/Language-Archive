@@ -6,28 +6,7 @@ use crate::data::ops::*;
 
 use super::token::*;
 
-// enum SyntaxType
-// {
-// 	CLike,
-// 	RustLike
-// }
-
-// struct Options
-// {
-// 	syntax_type: SyntaxType
-// }
-
-// enum Result
-// {
-// 	Success
-// }
-
-// struct Output
-// {
-// 	result: Result,
-// 	string: String,
-// 	tokens: Vec<Token>
-// }
+let i = 10;
 
 pub fn lex(data: String) -> VecDeque<Token>
 {
@@ -40,12 +19,6 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 	while let Some(c) = chars.next()
 	{
-		let info = TokenInfo
-		{
-			line,
-			column
-		};
-
 		column += 1;
 
 		match c
@@ -61,28 +34,46 @@ pub fn lex(data: String) -> VecDeque<Token>
 				column = 1;
 			}
 
-			'+' =>
+			'+' | '-' | '*' | '/' =>
 			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Add));
-			}
+				let info = TokenInfo
+				{
+					line,
+					column_begin: column,
+					column_end: column + 1
+				};
 
-			'-' =>
-			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Subtract));
-			}
+				match c
+				{
+					'+' =>
+					{
+						tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Add));
+					}
 
-			'*' =>
-			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Multiply));
-			}
+					'-' =>
+					{
+						tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Subtract));
+					}
+		
+					'*' =>
+					{
+						tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Multiply));
+					}
+		
+					'/' =>
+					{
+						tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Divide));
+					}
 
-			'/' =>
-			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Divide));
+					_ => unreachable!()
+				}
+
 			}
 
 			'0'..='9' =>
 			{
+				let column_begin = column;
+
 				let mut num = String::new();
 				num.push(c);
 
@@ -98,6 +89,13 @@ pub fn lex(data: String) -> VecDeque<Token>
 					column += 1;
 				}
 
+				let info = TokenInfo
+				{
+					line,
+					column_begin: column_begin,
+					column_end: column
+				};
+
 				if let Ok(val) = num.parse::<i32>()
 				{
 					tokens.push_back(Token::new_integer_literal(info, val));
@@ -106,6 +104,8 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 			'a'..='z' | 'A'..='Z' | '_' =>
 			{
+				let column_begin = column;
+
 				let mut ident = String::new();
 				ident.push(c); // include the first character
 
@@ -120,6 +120,13 @@ pub fn lex(data: String) -> VecDeque<Token>
 					chars.next();
 					column += 1;
 				}
+
+				let info = TokenInfo
+				{
+					line,
+					column_begin: column_begin,
+					column_end: column
+				};
 
 				match ident.as_str()
 				{
@@ -139,11 +146,20 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 			'=' =>
 			{
+				let mut info = TokenInfo
+				{
+					line,
+					column_begin: column,
+					column_end: column
+				};
+
 				if *chars.peek().unwrap() == '='
 				{
+					column += 1;
+					info.column_end = column;
+
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsEqual));
 					chars.next();
-					column += 1;
 				}
 				else
 				{
@@ -153,11 +169,20 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 			'!' =>
 			{
+				let mut info = TokenInfo
+				{
+					line,
+					column_begin: column,
+					column_end: column
+				};
+
 				if *chars.peek().unwrap() == '='
 				{
+					column += 1;
+					info.column_end = column;
+
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsNotEqual));
 					chars.next();
-					column += 1;
 				}
 				else 
 				{
@@ -167,11 +192,20 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 			'<' =>
 			{
+				let mut info = TokenInfo
+				{
+					line,
+					column_begin: column,
+					column_end: column
+				};
+
 				if *chars.peek().unwrap() == '='
 				{
+					column += 1;
+					info.column_end = column;
+					
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsLessOrEqual));
 					chars.next();
-					column += 1;
 				}
 				else
 				{
@@ -181,11 +215,20 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 			'>' =>
 			{
+				let mut info = TokenInfo
+				{
+					line,
+					column_begin: column,
+					column_end: column
+				};
+
 				if *chars.peek().unwrap() == '='
 				{
+					column += 1;
+					info.column_end = column;
+					
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsGreaterOrEqual));
 					chars.next();
-					column += 1;
 				}
 				else
 				{
@@ -193,29 +236,44 @@ pub fn lex(data: String) -> VecDeque<Token>
 				}
 			}
 
-			'(' =>
+			'(' | ')' | '{' | '}' | ';' =>
 			{
-				tokens.push_back(Token::new_symbol(info, Symbol::LeftParen));
-			}
+				let info = TokenInfo
+				{
+					line,
+					column_begin: column,
+					column_end: column + 1
+				};
 
-			')' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::RightParen));
-			}
+				match c
+				{
+					'(' =>
+					{
+						tokens.push_back(Token::new_symbol(info, Symbol::LeftParen));
+					}
+		
+					')' =>
+					{
+						tokens.push_back(Token::new_symbol(info, Symbol::RightParen));
+					}
+		
+					'{' =>
+					{
+						tokens.push_back(Token::new_symbol(info, Symbol::LeftBrace));
+					}
+		
+					'}' =>
+					{
+						tokens.push_back(Token::new_symbol(info, Symbol::RightBrace));
+					}
+		
+					';' =>
+					{
+						tokens.push_back(Token::new_symbol(info, Symbol::Semicolon));
+					}
 
-			'{' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::LeftBrace));
-			}
-
-			'}' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::RightBrace));
-			}
-
-			';' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::Semicolon));
+					_ => unreachable!()
+				}
 			}
 
 			unknown =>

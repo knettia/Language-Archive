@@ -10,7 +10,8 @@ pub struct TokenInfo
 {
 	// Debug:
 	pub line: i16,
-	pub column: i16
+	pub column_begin: i16,
+	pub column_end: i16
 }
 
 #[derive(Debug, PartialEq, Eq)]
