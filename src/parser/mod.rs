@@ -22,8 +22,22 @@ use crate::data::{
 	vtype::*
 };
 
-// Internal operator enum for shunting yard
-fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token>) -> Expression
+pub struct ParserError
+{
+	pub message: String,
+	pub line: usize,
+	pub column: usize,
+	pub context_line: String
+}
+
+pub struct ParserContext<'a>
+{
+	pub source: &'a str,
+	pub symbols_table: SymbolsTable,
+	pub errors: Vec<ParserError>
+}
+
+fn parse_expression(parser_context: &mut ParserContext, mut tokens: VecDeque<Token>) -> Expression
 {
 	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 	enum Assoc
@@ -297,7 +311,7 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 							panic!("Unclosed parenthesis in expression");
 						}
 
-						let inner_expr = parse_expression(symbols_table, sub_tokens);
+						let inner_expr = parse_expression(parser_context, sub_tokens);
 						output_stack.push(inner_expr);
 					}
 
@@ -323,7 +337,7 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 						.expect("Token after `invoke` should be a function name")
 						.name();
 
-					let function_info = symbols_table
+					let function_info = parser_context.symbols_table
 						.get_function(&function_name)
 						.unwrap_or_else(|| panic!("Undefined function: `{}`", name));
 
@@ -401,7 +415,7 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 
 					for expr_tokens in expressions_passed
 					{
-						let expr = parse_expression(symbols_table, expr_tokens);
+						let expr = parse_expression(parser_context, expr_tokens);
 						passed_arguments.push_back(expr);
 					}
 
@@ -410,11 +424,11 @@ fn parse_expression(symbols_table: &mut SymbolsTable, mut tokens: VecDeque<Token
 				}
 				else
 				{
-					let id = symbols_table
+					let id = parser_context.symbols_table
 						.get_id(&name)
 						.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
 	
-					let vtype = symbols_table
+					let vtype = parser_context.symbols_table
 						.lookup(&name)
 						.unwrap_or_else(|| panic!("Undefined variable reference: `{}`", name));
 	
@@ -444,11 +458,11 @@ pub struct StatementReturn
 	remaining_tokens: VecDeque<Token>,
 }
 
-pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<Token>, manage_scope: bool) -> StatementReturn
+pub fn parse_statement(parser_context: &mut ParserContext, tokens: VecDeque<Token>, manage_scope: bool) -> StatementReturn
 {
-	let mut tokens = stmt_tokens.into_iter().peekable();
+	let mut tokens = tokens.clone();
 
-	while let Some(t) = tokens.next()
+	while let Some(t) = tokens.pop_front()
 	{
 		match t.get_type()
 		{
@@ -464,7 +478,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 				let mut depth = 1;
 				let mut sub_tokens: VecDeque<Token> = VecDeque::new();
 
-				while let Some(next_token) = tokens.next()
+				while let Some(next_token) = tokens.pop_front()
 				{
 					if next_token.get_type() == TokenType::Symbol
 					{
@@ -493,17 +507,16 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 					panic!("Unclosed brace");
 				}
 
-
 				if manage_scope
 				{
-					symbols_table.push_scope();
+					parser_context.symbols_table.push_scope();
 				}
 
 				let mut statements = VecDeque::new();
 
 				while !sub_tokens.is_empty()
 				{
-					let result = parse_statement(symbols_table, sub_tokens.clone(), true);
+					let result = parse_statement(parser_context, sub_tokens.clone(), true);
 
 					statements.push_back(result.statement);
 					sub_tokens = result.remaining_tokens;
@@ -511,7 +524,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 				
 				if manage_scope
 				{
-					symbols_table.pop_scope();
+					parser_context.symbols_table.pop_scope();
 				}
 
 				let statement = Statement::new_compound(statements);
@@ -519,7 +532,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 				return StatementReturn
 				{
 					statement,
-					remaining_tokens: tokens.collect()
+					remaining_tokens: tokens
 				};
 			},
 
@@ -529,18 +542,18 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 				if t.name() == "function"
 				{
-					if symbols_table.scope() != 1
+					if parser_context.symbols_table.scope() != 1
 					{
 						panic!("Can only declare function in root scope");
 					}
 
-					let t_name = tokens.next().expect("Expected identifier token after `function`");
+					let t_name = tokens.pop_front().expect("Expected identifier token after `function`");
 					let t_name = t_name
 						.as_token::<IdentifierToken>()
 						.expect("Expected identifier token after `function`")
 						.name();
 
-					let next_token = tokens.next().expect("Tokens should not stop here");
+					let next_token = tokens.pop_front().expect("Tokens should not stop here");
 					let t_leftparen = next_token.as_token::<SymbolToken>().expect("This should not happen");
 					if t_leftparen.sym() != Symbol::LeftParen
 					{
@@ -549,7 +562,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let mut sub_tokens = VecDeque::new();
 
-					while let Some(next_token) = tokens.next()
+					while let Some(next_token) = tokens.pop_front()
 					{
 						if next_token.get_type() == TokenType::Symbol
 						{
@@ -568,7 +581,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let mut parameters = VecDeque::new();
 
-					symbols_table.push_scope();
+					parser_context.symbols_table.push_scope();
 					
 					while let Some(sub_token) = iter_sub_token.next()
 					{
@@ -592,29 +605,29 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							}
 						}
 						
-						symbols_table.define(&param_id, param_vtype.clone());
+						parser_context.symbols_table.define(&param_id, param_vtype.clone());
 
-						let param = Parameter::new(symbols_table.get_id(&param_id).unwrap(), param_vtype.clone());
+						let param = Parameter::new(parser_context.symbols_table.get_id(&param_id).unwrap(), param_vtype.clone());
 						parameters.push_back(param);
 					}
 
-					let t_type_token = tokens.next().expect(format!("Expected type after function identifier `{}`", t_name).as_str());
+					let t_type_token = tokens.pop_front().expect(format!("Expected type after function identifier `{}`", t_name).as_str());
 					let vtype = t_type_token
 						.as_token::<TypeToken>()
 						.expect(format!("Expected type after function identifier `{}`", t_name).as_str())
 						.vtype();
 
-					symbols_table.define_function(&t_name, vtype.clone(), parameters.clone());
+					parser_context.symbols_table.define_function(&t_name, vtype.clone(), parameters.clone());
 
-					let next_token = tokens.peek().expect("Tokens should not stop here");
+					let next_token = tokens.front().expect("Tokens should not stop here");
 					let token_sym = next_token.as_token::<SymbolToken>()
 						.expect("Token after function statement should be a symbol")
 						.sym();
 
 					if token_sym == Symbol::Semicolon
 					{
-						tokens.next(); // consume ;
-						symbols_table.pop_scope();
+						tokens.pop_front(); // consume ;
+						parser_context.symbols_table.pop_scope();
 
 						let func_sign = FunctionSignature::new(t_name, vtype.clone(), parameters);
 						let func_declare_statement = Statement::new_function_declare(func_sign);
@@ -622,12 +635,12 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						return StatementReturn
 						{
 							statement: func_declare_statement,
-							remaining_tokens: tokens.collect()
+							remaining_tokens: tokens
 						}
 					}
 					else if token_sym == Symbol::LeftBrace
 					{
-						let result = parse_statement(symbols_table, tokens.clone().collect(), false);
+						let result = parse_statement(parser_context, tokens.clone(), false);
 	
 						let func_sign = FunctionSignature::new(t_name, vtype.clone(), parameters);
 
@@ -639,7 +652,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 								.clone()
 							);
 						
-						symbols_table.pop_scope();
+						parser_context.symbols_table.pop_scope();
 	
 						return StatementReturn
 						{
@@ -660,7 +673,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 				}
 				else if t.name() == "return"
 				{
-					if symbols_table.scope() == 1
+					if parser_context.symbols_table.scope() == 1
 					{
 						panic!("Cannot return in root scope");
 					}
@@ -669,7 +682,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					loop
 					{
-						let Some(next_token) = tokens.peek() else
+						let Some(next_token) = tokens.front() else
 						{
 							break;
 						};
@@ -682,13 +695,13 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							{
 								if sym_token.sym() == Symbol::Semicolon
 								{
-									tokens.next(); // consume ;
+									tokens.pop_front(); // consume ;
 									break;
 								}
 							}
 						}
 
-						if let Some(token) = tokens.next()
+						if let Some(token) = tokens.pop_front()
 						{
 							expr_tokens.push_back(token);
 						}
@@ -702,25 +715,25 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 					}
 					else
 					{
-						expr = Some(parse_expression(symbols_table, expr_tokens))
+						expr = Some(parse_expression(parser_context, expr_tokens))
 					}
 
 					return StatementReturn
 					{
 						statement: Statement::new_function_return(expr),
-						remaining_tokens: tokens.collect()
+						remaining_tokens: tokens
 					}
 				}
 				else if t.name() == "let"
 				{
 					// Variable declaration: let <name> <type> = <expr>;
-					let t_name = tokens.next().expect("Expected identifier token after `let`");
+					let t_name = tokens.pop_front().expect("Expected identifier token after `let`");
 					let t_name = t_name
 						.as_token::<IdentifierToken>()
 						.expect("Expected identifier token")
 						.name();
 
-					let t_type_token = tokens.next().expect(format!("Expected type after identifier `{}`", t_name).as_str());
+					let t_type_token = tokens.pop_front().expect(format!("Expected type after identifier `{}`", t_name).as_str());
 					let vtype = t_type_token
 						.as_token::<TypeToken>()
 						.expect("Expected a type token")
@@ -731,7 +744,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 						panic!("Variable has invalid void type");
 					}
 
-					let eq_token = tokens.next().expect("Expected '=' after type");
+					let eq_token = tokens.pop_front().expect("Expected '=' after type");
 					let sym = eq_token
 						.as_token::<SymbolToken>()
 						.expect("Expected symbol token for '='")
@@ -741,7 +754,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let mut expr_tokens: VecDeque<Token> = VecDeque::new();
 
-					while let Some(next_token) = tokens.peek()
+					while let Some(next_token) = tokens.front()
 					{
 						if next_token.get_type() == TokenType::Symbol
 						{
@@ -749,49 +762,49 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							{
 								if sym_token.sym() == Symbol::Semicolon
 								{
-									tokens.next(); // consume ;
+									tokens.pop_front(); // consume ;
 									break;
 								}
 							}
 						}
 
-						if let Some(tok) = tokens.next()
+						if let Some(tok) = tokens.pop_front()
 						{
 							expr_tokens.push_back(tok);
 						}
 					}
 
-					let expr = parse_expression(symbols_table, expr_tokens);
+					let expr = parse_expression(parser_context, expr_tokens);
 
-					symbols_table.define(&t_name, vtype.clone());
+					parser_context.symbols_table.define(&t_name, vtype.clone());
 
-					let statement = Statement::new_declare(vtype, symbols_table.get_id(&t_name).unwrap(), expr);
+					let statement = Statement::new_declare(vtype, parser_context.symbols_table.get_id(&t_name).unwrap(), expr);
 
 					return StatementReturn
 					{
 						statement,
-						remaining_tokens: tokens.collect()
+						remaining_tokens: tokens
 					};
 				}
 				else if t.name() == "set"
 				{
-					if symbols_table.scope() == 1
+					if parser_context.symbols_table.scope() == 1
 					{
 						panic!("Cannot set in root scope");
 					}
 
 					// Variable assignment: set <name> = <expr>;
-					let t_name = tokens.next().expect("Expected identifier after `set`");
+					let t_name = tokens.pop_front().expect("Expected identifier after `set`");
 					let t_name = t_name
 						.as_token::<IdentifierToken>()
 						.expect("Expected identifier token")
 						.name();
 
-					let id = symbols_table
+					let id = parser_context.symbols_table
 						.get_id(&t_name)
 						.unwrap_or_else(|| panic!("Symbol `{}` not found in current scope", t_name));
 
-					let eq_token = tokens.next().expect("Expected '=' after identifier");
+					let eq_token = tokens.pop_front().expect("Expected '=' after identifier");
 					let sym = eq_token
 						.as_token::<SymbolToken>()
 						.expect("Expected symbol token for '='")
@@ -800,7 +813,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					let mut expr_tokens: VecDeque<Token> = VecDeque::new();
 
-					while let Some(next_token) = tokens.peek()
+					while let Some(next_token) = tokens.front()
 					{
 						if next_token.get_type() == TokenType::Symbol
 						{
@@ -808,31 +821,31 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							{
 								if sym_token.sym() == Symbol::Semicolon
 								{
-									tokens.next(); // consume ;
+									tokens.pop_front(); // consume ;
 									break;
 								}
 							}
 						}
 
-						if let Some(tok) = tokens.next()
+						if let Some(tok) = tokens.pop_front()
 						{
 							expr_tokens.push_back(tok);
 						}
 					}
 
-					let expr = parse_expression(symbols_table, expr_tokens);
+					let expr = parse_expression(parser_context, expr_tokens);
 
 					let statement = Statement::new_assign(id, expr);
 
 					return StatementReturn
 					{
 						statement,
-						remaining_tokens: tokens.collect()
+						remaining_tokens: tokens
 					};
 				}
 				else if t.name() == "print"
 				{
-					if symbols_table.scope() == 1
+					if parser_context.symbols_table.scope() == 1
 					{
 						panic!("Cannot print in root scope");
 					}
@@ -841,7 +854,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					loop
 					{
-						let Some(next_token) = tokens.peek() else
+						let Some(next_token) = tokens.front() else
 						{
 							break;
 						};
@@ -854,29 +867,29 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							{
 								if sym_token.sym() == Symbol::Semicolon
 								{
-									tokens.next(); // consume ;
+									tokens.pop_front(); // consume ;
 									break;
 								}
 							}
 						}
 
-						if let Some(token) = tokens.next()
+						if let Some(token) = tokens.pop_front()
 						{
 							expr_tokens.push_back(token);
 						}
 					}
 
-					let expr = parse_expression(symbols_table, expr_tokens);
+					let expr = parse_expression(parser_context, expr_tokens);
 
 					return StatementReturn
 					{
 						statement: Statement::new_print(expr),
-						remaining_tokens: tokens.collect()
+						remaining_tokens: tokens
 					}
 				}
 				else if t.name() == "express"
 				{
-					if symbols_table.scope() == 1
+					if parser_context.symbols_table.scope() == 1
 					{
 						panic!("Cannot express in root scope");
 					}
@@ -885,7 +898,7 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 
 					loop
 					{
-						let Some(next_token) = tokens.peek() else
+						let Some(next_token) = tokens.front() else
 						{
 							break;
 						};
@@ -898,24 +911,24 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 							{
 								if sym_token.sym() == Symbol::Semicolon
 								{
-									tokens.next(); // consume ;
+									tokens.pop_front(); // consume ;
 									break;
 								}
 							}
 						}
 
-						if let Some(token) = tokens.next()
+						if let Some(token) = tokens.pop_front()
 						{
 							expr_tokens.push_back(token);
 						}
 					}
 
-					let expr = parse_expression(symbols_table, expr_tokens);
+					let expr = parse_expression(parser_context, expr_tokens);
 
 					return StatementReturn
 					{
 						statement: Statement::new_expression(expr),
-						remaining_tokens: tokens.collect()
+						remaining_tokens: tokens
 					}
 				}
 				else
@@ -931,24 +944,29 @@ pub fn parse_statement(symbols_table: &mut SymbolsTable, stmt_tokens: VecDeque<T
 	panic!();
 }
 
-pub fn parse_root(source: String) -> Root
+pub fn parse_root(source: String) -> (Root, Vec<ParserError>)
 {
-	let tokens = lex(source);
+	let ref_source = source.as_str();
+
+	let mut tokens = lex(ref_source.into());
 	let mut root = Root::new();
 
-	let mut token_queue = tokens.into_iter().collect::<VecDeque<_>>();
-
-	let mut symbols_table = SymbolsTable::new();
-
-	symbols_table.push_scope();
-
-	while !token_queue.is_empty()
+	let mut parser_context = ParserContext
 	{
-		let result = parse_statement(&mut symbols_table, token_queue.clone(), true);
+		source: ref_source,
+		symbols_table: SymbolsTable::new(),
+		errors: Vec::new()
+	};
 
+	parser_context.symbols_table.push_scope();
+
+	while !tokens.is_empty()
+	{
+		let result = parse_statement(&mut parser_context, tokens.clone(), true);
+		
 		root.add(result.statement);
-		token_queue = result.remaining_tokens;
+		tokens = result.remaining_tokens;
 	}
 
-	root
+	(root, parser_context.errors)
 }
