@@ -55,7 +55,7 @@ impl Scope
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SymbolsTable
 {
 	functions: HashMap<String, FunctionSignature>,
