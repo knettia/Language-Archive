@@ -6,8 +6,6 @@ use crate::data::ops::*;
 
 use super::token::*;
 
-let i = 10;
-
 pub fn lex(data: String) -> VecDeque<Token>
 {
 	let mut chars = data.chars().peekable();
