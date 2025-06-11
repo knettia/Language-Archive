@@ -9,9 +9,9 @@ use crate::data::vtype::VType;
 pub struct TokenInfo
 {
 	// Debug:
-	pub line: i16,
-	pub column_begin: i16,
-	pub column_end: i16
+	pub line: usize,
+	pub column_begin: usize,
+	pub column_end: usize
 }
 
 #[derive(Debug, PartialEq, Eq)]
