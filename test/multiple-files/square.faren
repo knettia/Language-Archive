@@ -1,6 +1,4 @@
-function square_faren (x int) int
-
-export C function square_faren(x int) int
+function square_faren(x int) int
 {
 	return x * x;
 }
