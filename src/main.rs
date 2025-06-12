@@ -11,21 +11,21 @@ use codegen::generator::*;
 
 use ansi_term::Colour;
 
-fn record_warning(msg: &str)
+fn record_warning(msger: &str, msg: &str)
 {
 	let label = Colour::Yellow.bold().paint("warning:");
-	eprintln!("farenc: {} {}", label, msg);
+	eprintln!("{}: {} {}", msger, label, msg);
 }
 
-fn record_error(msg: &str)
+fn record_error(msger: &str, msg: &str)
 {
 	let label = Colour::Red.bold().paint("error:");
-	eprintln!("farenc: {} {}", label, msg);
+	eprintln!("{}: {} {}", msger, label, msg);
 }
 
 fn exit_error(msg: &str) -> !
 {
-	record_error(msg);
+	record_error("farenc", msg);
 	process::exit(1);
 }
 
@@ -183,7 +183,6 @@ fn link_objects(object_paths: Vec<String>, output_path: String, output_type: Out
 			}
 		}
 
-
 		OutputType::Archive =>
 		{
 			let mut command = process::Command::new("ar");
@@ -225,7 +224,61 @@ fn compile_to_object(source: String, output: String, dump_ir: Option<String>, du
 
 	let context = inkwell::context::Context::create();
 	let contents = read_file_or_exit(&source);
-	let root = parser::parse_root(contents);
+	let (root, errors) = parser::parse_root(contents);
+
+	if errors.len() > 0
+	{
+		for error in errors
+		{
+			let mut highlight = String::new();
+
+			let begin = error.column_begin.saturating_sub(1);
+			let end = error.column_end.saturating_sub(1);
+
+			let mut cursor = 0;
+
+			for c in error.context_line.chars()
+			{
+				if c == '\t'
+				{
+					for _ in 0..8
+					{
+						if cursor >= begin && cursor <= end
+						{
+							highlight.push('^');
+						}
+						else
+						{
+							highlight.push(' ');
+						}
+					}
+
+					cursor += 1;
+				}
+				else
+				{
+					if cursor >= begin && cursor <= end
+					{
+						highlight.push('^');
+					}
+					else
+					{
+						highlight.push(' ');
+					}
+
+					cursor += 1;
+				}
+			}
+
+			let message = Colour::White.bold().paint(error.message);
+			let highlight = Colour::Green.bold().paint(highlight);
+
+			record_error(
+				&format!("{}:{}.{}", source, error.line, error.column_begin),
+				&format!("{}\n{}\n{}", &message, error.context_line, highlight)
+			);
+		}
+	}
 
 	let mut generator = Generator::new(&context, "main_module");
 	generator.generate(&root);
@@ -275,14 +328,14 @@ fn compile_to_object(source: String, output: String, dump_ir: Option<String>, du
 
 		if ext != "ll"
 		{
-			record_warning("IR artifact extension is not `.ll`");
+			record_warning("farenc", "IR artifact extension is not `.ll`");
 		}
 
 		let err = fs::copy(&ir_path, ir_out.clone());
 
 		if err.is_err()
 		{
-			record_error(&format!("emitting IR artifact failed: {}", err.unwrap_err()));
+			record_error("farenc", &format!("emitting IR artifact failed: {}", err.unwrap_err()));
 		}
 	}
 	
@@ -295,14 +348,14 @@ fn compile_to_object(source: String, output: String, dump_ir: Option<String>, du
 
 		if ext != "S"
 		{
-			record_warning("ASM artifact extension is not `.S`");
+			record_warning("farenc", "ASM artifact extension is not `.S`");
 		}
 
 		let err = fs::copy(&asm_path, asm_out.clone());
 
 		if err.is_err()
 		{
-			record_error(&format!("emitting ASM artifact failed: {}", err.unwrap_err()));
+			record_error("farenc", &format!("emitting ASM artifact failed: {}", err.unwrap_err()));
 		}
 	}
 

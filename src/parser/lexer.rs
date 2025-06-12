@@ -1,57 +1,39 @@
 use std::collections::VecDeque;
 
-use crate::data::vtype::VType;
-use crate::data::syms::Symbol;
-use crate::data::ops::*;
+use crate::data::{
+	vtype::VType,
+	syms::Symbol,
+	ops::*
+};
 
 use super::token::*;
-
-// enum SyntaxType
-// {
-// 	CLike,
-// 	RustLike
-// }
-
-// struct Options
-// {
-// 	syntax_type: SyntaxType
-// }
-
-// enum Result
-// {
-// 	Success
-// }
-
-// struct Output
-// {
-// 	result: Result,
-// 	string: String,
-// 	tokens: Vec<Token>
-// }
 
 pub fn lex(data: String) -> VecDeque<Token>
 {
 	let mut chars = data.chars().peekable();
 
-	let mut line: i16 = 1;
-	let mut column: i16 = 1;
+	let mut line: usize = 1;
+	let mut column: usize = 1;
 
 	let mut tokens: VecDeque<Token> = VecDeque::new();
 
-	while let Some(c) = chars.next()
+	fn make_info(line: usize, column_begin: usize, token_len: usize) -> TokenInfo
 	{
-		let info = TokenInfo
+		TokenInfo
 		{
 			line,
-			column
-		};
+			column_begin,
+			column_end: column_begin + token_len - 1
+		}
+	}
 
-		column += 1;
-
+	while let Some(c) = chars.next()
+	{
 		match c
 		{
 			' ' | '\t' =>
 			{
+				column += 1;
 				continue;
 			}
 
@@ -61,24 +43,19 @@ pub fn lex(data: String) -> VecDeque<Token>
 				column = 1;
 			}
 
-			'+' =>
+			'+' | '-' | '*' | '/' =>
 			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Add));
-			}
+				let info = make_info(line, column, 1);
+				column += 1;
 
-			'-' =>
-			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Subtract));
-			}
-
-			'*' =>
-			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Multiply));
-			}
-
-			'/' =>
-			{
-				tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Divide));
+				match c
+				{
+					'+' => tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Add)),
+					'-' => tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Subtract)),
+					'*' => tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Multiply)),
+					'/' => tokens.push_back(Token::new_arithmetic(info, ArithmeticOperation::Divide)),
+					_ => unreachable!()
+				}
 			}
 
 			'0'..='9' =>
@@ -86,17 +63,21 @@ pub fn lex(data: String) -> VecDeque<Token>
 				let mut num = String::new();
 				num.push(c);
 
+				let mut token_len = 1;
+
 				while let Some(current) = chars.peek()
 				{
 					if !current.is_ascii_digit()
 					{
 						break;
 					}
-
 					num.push(*current);
 					chars.next();
-					column += 1;
+					token_len += 1;
 				}
+
+				let info = make_info(line, column, token_len);
+				column += token_len;
 
 				if let Ok(val) = num.parse::<i32>()
 				{
@@ -107,7 +88,9 @@ pub fn lex(data: String) -> VecDeque<Token>
 			'a'..='z' | 'A'..='Z' | '_' =>
 			{
 				let mut ident = String::new();
-				ident.push(c); // include the first character
+				ident.push(c);
+
+				let mut token_len = 1;
 
 				while let Some(current) = chars.peek()
 				{
@@ -115,11 +98,13 @@ pub fn lex(data: String) -> VecDeque<Token>
 					{
 						break;
 					}
-
 					ident.push(*current);
 					chars.next();
-					column += 1;
+					token_len += 1;
 				}
+
+				let info = make_info(line, column, token_len);
+				column += token_len;
 
 				match ident.as_str()
 				{
@@ -139,83 +124,98 @@ pub fn lex(data: String) -> VecDeque<Token>
 
 			'=' =>
 			{
-				if *chars.peek().unwrap() == '='
+				let mut token_len = 1;
+
+				if let Some('=') = chars.peek()
 				{
-					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsEqual));
 					chars.next();
-					column += 1;
+					token_len += 1;
+					let info = make_info(line, column, token_len);
+					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsEqual));
 				}
 				else
 				{
+					let info = make_info(line, column, 1);
 					tokens.push_back(Token::new_symbol(info, Symbol::Equal));
 				}
+
+				column += token_len;
 			}
 
 			'!' =>
 			{
-				if *chars.peek().unwrap() == '='
+				let mut token_len = 1;
+
+				if let Some('=') = chars.peek()
 				{
-					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsNotEqual));
 					chars.next();
-					column += 1;
+					token_len += 1;
+					let info = make_info(line, column, token_len);
+					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsNotEqual));
 				}
-				else 
+				else
 				{
+					let info = make_info(line, column, token_len);
 					tokens.push_back(Token::new_symbol(info, Symbol::Bang));
 				}
+
+				column += token_len;
 			}
 
 			'<' =>
 			{
-				if *chars.peek().unwrap() == '='
+				let mut token_len = 1;
+
+				if let Some('=') = chars.peek()
 				{
-					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsLessOrEqual));
 					chars.next();
-					column += 1;
+					token_len += 1;
+					let info = make_info(line, column, token_len);
+					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsLessOrEqual));
 				}
 				else
 				{
+					let info = make_info(line, column, token_len);
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsLess));
 				}
+
+				column += token_len;
 			}
 
 			'>' =>
 			{
-				if *chars.peek().unwrap() == '='
+				let mut token_len = 1;
+
+				if let Some('=') = chars.peek()
 				{
-					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsGreaterOrEqual));
 					chars.next();
-					column += 1;
+					token_len += 1;
+					let info = make_info(line, column, token_len);
+					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsGreaterOrEqual));
 				}
 				else
 				{
+					let info = make_info(line, column, token_len);
 					tokens.push_back(Token::new_comparison(info, ComparisonOperation::IsGreater));
 				}
+				
+				column += token_len;
 			}
 
-			'(' =>
+			'(' | ')' | '{' | '}' | ';' =>
 			{
-				tokens.push_back(Token::new_symbol(info, Symbol::LeftParen));
-			}
+				let info = make_info(line, column, 1);
+				column += 1;
 
-			')' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::RightParen));
-			}
-
-			'{' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::LeftBrace));
-			}
-
-			'}' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::RightBrace));
-			}
-
-			';' =>
-			{
-				tokens.push_back(Token::new_symbol(info, Symbol::Semicolon));
+				match c
+				{
+					'(' => tokens.push_back(Token::new_symbol(info, Symbol::LeftParen)),
+					')' => tokens.push_back(Token::new_symbol(info, Symbol::RightParen)),
+					'{' => tokens.push_back(Token::new_symbol(info, Symbol::LeftBrace)),
+					'}' => tokens.push_back(Token::new_symbol(info, Symbol::RightBrace)),
+					';' => tokens.push_back(Token::new_symbol(info, Symbol::Semicolon)),
+					_ => unreachable!()
+				}
 			}
 
 			unknown =>
@@ -225,5 +225,5 @@ pub fn lex(data: String) -> VecDeque<Token>
 		}
 	}
 
-	return tokens;
+	tokens
 }
