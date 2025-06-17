@@ -1,10 +1,10 @@
 [package]
 name = "farenc"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-dyn-clone = "1.0.19"
+faren-canon = { path = "../faren-canon" }
 inkwell = { version = "0.6.0", features = ["llvm16-0"] }
 ansi_term = "0.12"
 clap = { version = "4", features = ["derive"] }

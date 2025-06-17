@@ -12,8 +12,8 @@
 - [ ] Compile freestanding binaries
   - [ ] Binaries that do not rely on `libc` or `clang`
   - [ ] A custom ABI distinct from C ABI 
-- [ ] Better compiling
-  - [ ] Allow multiple objects to link to eachother
+- [x] Better compiling
+  - [x] Allow multiple objects to link to eachother
 - [ ] Create Ruby tests for compiling using `RSpec`
 
 
@@ -24,6 +24,14 @@
 - [Inkwell](https://github.com/TheDan64/inkwell)
 
 # Compiling `farenc`:
+
+Before building, you must ensure you have the [`faren-canon`](https://codeberg.org/knettia/faren-canon) crate cloned in the parent directory (or you could modify its path in `Cargo.toml`)
+
+```sh
+cd ..
+git clone https://codeberg.org/knettia/faren-canon
+```
+
 Build `farenc` like the following:
 
 ```sh
@@ -67,7 +75,7 @@ Linking Faren relocatable object files into an executable binary:
 farenc -s source.o -o source
 ```
 
-You can also expose artifacts during compilation with the following flags:
+You can also expose artefacts during compilation with the following flags:
 
 ```sh
 farenc -s source.faren -o source.o \
