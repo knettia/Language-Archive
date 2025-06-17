@@ -20,6 +20,7 @@
 # Requirements:
 - [Rust](https://www.rust-lang.org/)
 - [`cargo`](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+- [`faren-canon`](https://codeberg.org/knettia/faren-canon)
 - LLVM 16 or later
 - [Inkwell](https://github.com/TheDan64/inkwell)
 
