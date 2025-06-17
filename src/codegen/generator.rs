@@ -22,7 +22,7 @@ use inkwell::
 	}
 };
 
-use crate::ast::
+use faren_canon::ast::
 {
 	root::*,
 	statement::*,
@@ -30,7 +30,7 @@ use crate::ast::
 	literal::*,
 };
 
-use crate::data::
+use faren_canon::data::
 {
 	vtype::*,
 	ops::*

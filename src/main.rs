@@ -2,10 +2,7 @@ use clap::Parser;
 use std::path::Path;
 use std::{env, fs, process};
 
-mod ast;
 mod codegen;
-mod data;
-mod parser;
 
 use codegen::generator::*;
 
@@ -224,7 +221,7 @@ fn compile_to_object(source: String, output: String, dump_ir: Option<String>, du
 
 	let context = inkwell::context::Context::create();
 	let contents = read_file_or_exit(&source);
-	let (root, errors) = parser::parse_root(contents);
+	let (root, errors) = faren_canon::parser::parse_root(contents);
 
 	if errors.len() > 0
 	{
@@ -274,7 +271,7 @@ fn compile_to_object(source: String, output: String, dump_ir: Option<String>, du
 			let highlight = Colour::Green.bold().paint(highlight);
 
 			record_error(
-				&format!("{}:{}.{}", source, error.line, error.column_begin),
+				&format!("{}:{}:{}", source, error.line, error.column_begin),
 				&format!("{}\n{}\n{}", &message, error.context_line, highlight)
 			);
 		}

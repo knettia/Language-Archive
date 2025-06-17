@@ -1,5 +1,4 @@
-
-use crate::data::vtype::VType;
+use faren_canon::data::vtype::VType;
 use inkwell::values::BasicValueEnum;
 
 pub struct MetaValue<'ctx>
