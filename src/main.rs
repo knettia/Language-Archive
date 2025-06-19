@@ -275,6 +275,8 @@ fn compile_to_object(source: String, output: String, dump_ir: Option<String>, du
 				&format!("{}\n{}\n{}", &message, error.context_line, highlight)
 			);
 		}
+
+		exit_error("compilation failed");
 	}
 
 	let mut generator = Generator::new(&context, "main_module");
