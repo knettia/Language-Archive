@@ -96,7 +96,7 @@ impl<'ctx> Generator<'ctx>
 					"calltmp"
 				).unwrap();
 
-				let return_type = function_call_expression.virtual_type();
+				let return_type = function_call_expression.vtype();
 
 				let return_value = match return_type
 				{
@@ -145,14 +145,14 @@ impl<'ctx> Generator<'ctx>
 
 					VType::Integer =>
 					{
-						let int_val = literal_expression.literal.as_literal::<IntegerLiteral>().unwrap().value;
+						let int_val = literal_expression.literal().as_literal::<IntegerLiteral>().unwrap().value;
 						let llvm_int = self.context.i32_type().const_int(int_val as u64, true);
 						return MetaValue { vtype: VType::Integer, llvm: Some(llvm_int.into()) };
 					},
 
 					VType::Boolean =>
 					{
-						let bool_val = literal_expression.literal.as_literal::<BooleanLiteral>().unwrap().value;
+						let bool_val = literal_expression.literal().as_literal::<BooleanLiteral>().unwrap().value;
 						let llvm_bool = self.context.bool_type().const_int(if bool_val { 1 } else { 0 }, false);
 						return MetaValue { vtype: VType::Boolean, llvm: Some(llvm_bool.into()) };
 					}
@@ -288,7 +288,7 @@ impl<'ctx> Generator<'ctx>
 
 						return MetaValue
 						{
-							vtype: expression.virtual_type(),
+							vtype: expression.vtype(),
 							llvm: match expression.op()
 							{
 								ComparisonOperation::IsEqual =>
@@ -370,7 +370,7 @@ impl<'ctx> Generator<'ctx>
 
 						return MetaValue
 						{
-							vtype: expression.virtual_type(),
+							vtype: expression.vtype(),
 							llvm: match expression.op()
 							{
 								ComparisonOperation::IsEqual =>
