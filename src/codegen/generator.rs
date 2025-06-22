@@ -550,7 +550,7 @@ impl<'ctx> Generator<'ctx>
 
 	pub fn generate_statement(&mut self, statement: Statement)
 	{
-		match statement.statement_type()
+		match statement.stype()
 		{
 			StatementType::FunctionDefine =>
 			{
