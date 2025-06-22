@@ -9,4 +9,6 @@ function main() int
 
 	print hello;
 	print hello / 2 == 10;
+
+	return 0;
 }
